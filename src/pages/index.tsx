@@ -1,8 +1,8 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Mic, Volume2, Loader2, MessageCircle, Trash2, AlertCircle } from "lucide-react";
+import { HelpCard } from "@/components/HelpCard";
 
 interface ConversationItem {
   question: string;
@@ -93,6 +93,22 @@ export default function HomePage() {
       localStorage.setItem("lois-conversations", JSON.stringify(conversation.slice(0, 10)));
     }
   }, [conversation]);
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !isProcessing && browserSupported) {
+        e.preventDefault();
+        if (isListening) {
+          stopListening();
+        } else {
+          startListening();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [isListening, isProcessing, browserSupported]);
 
   const startListening = () => {
     if (!recognitionRef.current) {
@@ -220,6 +236,10 @@ export default function HomePage() {
           </h1>
           <p className="text-xl sm:text-2xl text-gray-600">Ask me anything, anytime</p>
         </header>
+
+        <div className="mb-8">
+          <HelpCard />
+        </div>
 
         {!browserSupported && (
           <Card className="p-6 mb-6 bg-red-50 border-red-200">

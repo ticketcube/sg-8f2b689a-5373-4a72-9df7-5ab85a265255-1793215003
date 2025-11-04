@@ -25,11 +25,26 @@ export default async function handler(
   }
 
   try {
-    const answer = await getAnswer(question);
+    const answer = await getAnswerWithRetry(question);
     return res.status(200).json({ answer });
   } catch (error) {
     console.error("Error processing question:", error);
-    return res.status(500).json({ error: "Failed to process question" });
+    return res.status(500).json({ 
+      error: "I'm having trouble connecting right now. Please try again in a moment." 
+    });
+  }
+}
+
+async function getAnswerWithRetry(question: string, retries = 2): Promise<string> {
+  try {
+    return await getAnswer(question);
+  } catch (error) {
+    if (retries > 0) {
+      console.log(`Retrying... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return getAnswerWithRetry(question, retries - 1);
+    }
+    throw error;
   }
 }
 
