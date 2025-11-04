@@ -1,4 +1,3 @@
-
 import type { NextApiRequest, NextApiResponse } from "next";
 
 type ResponseData = {
@@ -30,7 +29,7 @@ export default async function handler(
   } catch (error) {
     console.error("Error processing question:", error);
     return res.status(500).json({ 
-      error: "I'm having trouble connecting right now. Please try again in a moment." 
+      error: "I'm having trouble right now. Please try asking again in a moment." 
     });
   }
 }
@@ -49,124 +48,75 @@ async function getAnswerWithRetry(question: string, retries = 2): Promise<string
 }
 
 async function getAnswer(question: string): Promise<string> {
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  
+  if (openaiApiKey) {
+    return await askGPT(question, openaiApiKey);
+  }
+  
+  return await getBasicAnswer(question);
+}
+
+async function getBasicAnswer(question: string): Promise<string> {
   const lowerQuestion = question.toLowerCase();
   
-  const needsWebSearch = 
-    lowerQuestion.includes("current") ||
-    lowerQuestion.includes("today") ||
-    lowerQuestion.includes("latest") ||
-    lowerQuestion.includes("news") ||
-    lowerQuestion.includes("weather") ||
-    lowerQuestion.includes("when is") ||
-    lowerQuestion.includes("what time");
-
-  if (needsWebSearch) {
-    const searchAnswer = await searchWeb(question);
-    if (searchAnswer) return searchAnswer;
+  const greetings = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"];
+  if (greetings.some(g => lowerQuestion.includes(g))) {
+    return "Hello! I'm here to help you. What would you like to know?";
   }
-
-  return await askGPT(question);
-}
-
-async function searchWeb(question: string): Promise<string | null> {
-  const braveApiKey = process.env.BRAVE_SEARCH_API_KEY;
   
-  if (!braveApiKey) {
-    console.log("Brave Search API key not configured, falling back to GPT");
-    return null;
+  if (lowerQuestion.includes("how are you")) {
+    return "I'm doing well, thank you for asking! How can I help you today?";
+  }
+  
+  if (lowerQuestion.includes("what") && lowerQuestion.includes("time")) {
+    const now = new Date();
+    return `It's currently ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} on ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`;
+  }
+  
+  if (lowerQuestion.includes("what") && lowerQuestion.includes("day")) {
+    const now = new Date();
+    return `Today is ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`;
   }
 
-  try {
-    const response = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(question)}&count=3`,
-      {
-        headers: {
-          "Accept": "application/json",
-          "X-Subscription-Token": braveApiKey
-        }
-      }
-    );
-
-    if (!response.ok) {
-      console.error("Brave Search API error:", response.status);
-      return null;
-    }
-
-    const data = await response.json();
-    const results = data.web?.results || [];
-
-    if (results.length === 0) {
-      return null;
-    }
-
-    const context = results
-      .slice(0, 3)
-      .map((r: any) => `${r.title}: ${r.description}`)
-      .join("\n\n");
-
-    return await summarizeWithGPT(question, context);
-  } catch (error) {
-    console.error("Error searching web:", error);
-    return null;
+  if (lowerQuestion.includes("shabbat") || lowerQuestion.includes("sabbath")) {
+    return "Shabbat is the Jewish day of rest, beginning Friday evening at sunset and ending Saturday evening when three stars appear in the sky. It's a time for rest, prayer, and family.";
   }
+
+  if (lowerQuestion.includes("passover") || lowerQuestion.includes("pesach")) {
+    return "Passover is a major Jewish holiday celebrating the Israelites' exodus from slavery in Egypt. It lasts 7-8 days and includes the Seder meal with symbolic foods and the retelling of the Exodus story.";
+  }
+
+  if (lowerQuestion.includes("rosh hashanah")) {
+    return "Rosh Hashanah is the Jewish New Year, a time of reflection and renewal. It's celebrated with apples and honey (symbolizing a sweet new year), special prayers, and the blowing of the shofar.";
+  }
+
+  if (lowerQuestion.includes("yom kippur")) {
+    return "Yom Kippur is the Day of Atonement, the holiest day in Judaism. It's a day of fasting and prayer, asking for forgiveness for the past year's sins.";
+  }
+
+  if (lowerQuestion.includes("emergency") || lowerQuestion.includes("911")) {
+    return "For emergencies, always call 911 immediately. For medical questions, please consult with your doctor or healthcare provider.";
+  }
+
+  if (lowerQuestion.includes("medicine") || lowerQuestion.includes("medication")) {
+    return "For questions about your medications, please speak with your doctor or pharmacist. They have your medical history and can give you the best advice.";
+  }
+
+  if (lowerQuestion.includes("help") && !lowerQuestion.includes("can you help")) {
+    return "I'm here to help! You can ask me about general topics, Jewish holidays and traditions, the time and date, or I can provide friendly conversation. What would you like to know?";
+  }
+
+  return `I heard your question: "${question}"\n\nI can help with:\n• Time and date\n• Jewish holidays and traditions\n• General conversation\n• Emergency numbers (911)\n\nFor more detailed answers, an OpenAI API key can be added to enable advanced AI responses. But I'm always here to chat and help however I can!`;
 }
 
-async function summarizeWithGPT(question: string, context: string): Promise<string> {
-  const openaiApiKey = process.env.OPENAI_API_KEY;
-
-  if (!openaiApiKey) {
-    return `Based on recent information: ${context}`;
-  }
-
+async function askGPT(question: string, apiKey: string): Promise<string> {
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant for an 87-year-old woman. Provide clear, warm, and concise answers. Be patient and caring in your tone. Keep answers under 150 words."
-          },
-          {
-            role: "user",
-            content: `Question: ${question}\n\nContext from web search:\n${context}\n\nPlease provide a clear, friendly answer based on this information.`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 250
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error("OpenAI API error");
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
-  } catch (error) {
-    console.error("Error with GPT summarization:", error);
-    return `Based on recent information: ${context}`;
-  }
-}
-
-async function askGPT(question: string): Promise<string> {
-  const openaiApiKey = process.env.OPENAI_API_KEY;
-
-  if (!openaiApiKey) {
-    return "I need an OpenAI API key to answer questions. Please add your OPENAI_API_KEY to the environment variables in the Softgen settings.";
-  }
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiApiKey}`
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: "gpt-3.5-turbo",
@@ -194,6 +144,6 @@ async function askGPT(question: string): Promise<string> {
     return data.choices[0].message.content.trim();
   } catch (error) {
     console.error("Error asking GPT:", error);
-    throw error;
+    return await getBasicAnswer(question);
   }
 }
