@@ -67,7 +67,7 @@ export default function HomePage() {
         setTimeout(() => setError(null), 5000);
       };
 
-      const savedConversations = localStorage.getItem("lois-conversations");
+      const savedConversations = localStorage.getItem("aworkingbear-conversations");
       if (savedConversations) {
         try {
           const parsed = JSON.parse(savedConversations);
@@ -90,7 +90,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (conversation.length > 0) {
-      localStorage.setItem("lois-conversations", JSON.stringify(conversation.slice(0, 10)));
+      localStorage.setItem("aworkingbear-conversations", JSON.stringify(conversation.slice(0, 10)));
     }
   }, [conversation]);
 
@@ -177,14 +177,14 @@ export default function HomePage() {
       synthRef.current.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.85;
+      utterance.rate = 0.9;
       utterance.pitch = 1;
       utterance.volume = 1;
       utterance.lang = "en-US";
       
       const voices = synthRef.current.getVoices();
       const preferredVoice = voices.find(voice => 
-        voice.name.includes("Female") || voice.name.includes("Samantha")
+        voice.name.includes("Male") || voice.name.includes("Google US English")
       );
       if (preferredVoice) {
         utterance.voice = preferredVoice;
@@ -201,7 +201,7 @@ export default function HomePage() {
   const clearHistory = () => {
     if (confirm("Are you sure you want to clear all conversation history?")) {
       setConversation([]);
-      localStorage.removeItem("lois-conversations");
+      localStorage.removeItem("aworkingbear-conversations");
     }
   };
 
@@ -228,13 +228,13 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 p-4 sm:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
         <header className="text-center mb-8">
-          <h1 className="text-4xl sm:text-6xl font-bold text-gray-800 mb-2">
-            Lois's Assistant
+          <h1 className="text-4xl sm:text-6xl font-bold text-white mb-2">
+            aworkingbear's Assistant
           </h1>
-          <p className="text-xl sm:text-2xl text-gray-600">Ask me anything, anytime</p>
+          <p className="text-xl sm:text-2xl text-blue-200">Your AI-powered personal assistant</p>
         </header>
 
         <div className="mb-8">
@@ -294,7 +294,7 @@ export default function HomePage() {
             )}
           </Button>
 
-          <p className="text-lg text-gray-600 text-center max-w-md">
+          <p className="text-lg text-blue-100 text-center max-w-md">
             {isListening 
               ? "I'm listening... speak your question now" 
               : isProcessing 
@@ -311,7 +311,7 @@ export default function HomePage() {
           )}
 
           {isSpeaking && (
-            <div className="flex items-center gap-3 text-blue-600 bg-blue-50 px-6 py-3 rounded-full">
+            <div className="flex items-center gap-3 text-blue-100 bg-blue-600/50 backdrop-blur px-6 py-3 rounded-full">
               <Volume2 className="w-8 h-8 animate-pulse" />
               <span className="text-xl font-medium">Speaking answer...</span>
             </div>
@@ -321,7 +321,7 @@ export default function HomePage() {
         {conversation.length > 0 && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold text-gray-800">Recent Conversations</h2>
+              <h2 className="text-3xl font-bold text-white">Recent Conversations</h2>
               <Button
                 onClick={clearHistory}
                 variant="outline"

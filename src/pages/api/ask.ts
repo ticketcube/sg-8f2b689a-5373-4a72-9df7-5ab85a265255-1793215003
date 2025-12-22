@@ -104,10 +104,10 @@ async function getBasicAnswer(question: string): Promise<string> {
   }
 
   if (lowerQuestion.includes("help") && !lowerQuestion.includes("can you help")) {
-    return "I'm here to help! You can ask me about general topics, Jewish holidays and traditions, the time and date, or I can provide friendly conversation. What would you like to know?";
+    return "I'm here to help! You can ask me about general topics, the time and date, or I can provide friendly conversation. What would you like to know?";
   }
 
-  return `I heard your question: "${question}"\n\nI can help with:\n• Time and date\n• Jewish holidays and traditions\n• General conversation\n• Emergency numbers (911)\n\nFor more detailed answers, an OpenAI API key can be added to enable advanced AI responses. But I'm always here to chat and help however I can!`;
+  return `I heard your question: "${question}"\n\nI can help with:\n• Time and date\n• General conversation\n• Emergency numbers (911)\n\nFor more detailed answers, you can add an OpenAI API key in the settings to enable advanced AI responses. But I'm always here to chat and help however I can!`;
 }
 
 async function askGPT(question: string, apiKey: string): Promise<string> {
@@ -123,7 +123,7 @@ async function askGPT(question: string, apiKey: string): Promise<string> {
         messages: [
           {
             role: "system",
-            content: "You are a helpful, patient assistant for an 87-year-old Jewish woman named Lois. You have knowledge about general topics, Judaism, and health. Provide warm, clear, and concise answers. Be respectful and caring. Keep answers under 150 words unless asked for more detail."
+            content: "You are a helpful, knowledgeable assistant named aworkingbear's Assistant. Provide clear, concise, and accurate answers. Be friendly and professional. Keep answers under 150 words unless asked for more detail."
           },
           {
             role: "user",
