@@ -18,6 +18,7 @@ export default function Home() {
   const [showHistory, setShowHistory] = useState(false);
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [viewingItem, setViewingItem] = useState<SavedItem | null>(null);
+  const [inConversationMode, setInConversationMode] = useState(false);
   
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -97,6 +98,7 @@ export default function Home() {
 
   const startListening = () => {
     setError("");
+    setInConversationMode(true);
     
     if (recognitionRef.current) {
       try {
@@ -109,11 +111,22 @@ export default function Home() {
     }
   };
 
+  const endConversation = () => {
+    setInConversationMode(false);
+    setConversationHistory([]);
+    setCurrentQuestion("");
+    setCurrentAnswer("");
+    stopSpeaking();
+  };
+
   const handleSmartConversation = async (message: string) => {
     setIsProcessing(true);
     setError("");
 
     try {
+      // Check if user wants to end conversation
+      const isDone = /\b(that'?s all|i'?m done|that'?s everything|finished|stop)\b/i.test(message);
+
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
         headers: {
@@ -154,20 +167,19 @@ export default function Home() {
       // If item was saved, reload the saved items list
       if (data.savedItemId) {
         await loadSavedItems();
-        speakAnswer(data.response + " I've saved that for you.");
+        speakAnswer(data.response + " I've saved that for you.", isDone);
       } else {
-        speakAnswer(data.response);
+        speakAnswer(data.response, isDone);
       }
 
     } catch (error) {
       console.error("Error in conversation:", error);
       setError("Sorry, I had trouble processing that. Please try again.");
-    } finally {
       setIsProcessing(false);
     }
   };
 
-  const speakAnswer = (text: string) => {
+  const speakAnswer = (text: string, shouldEndConversation: boolean = false) => {
     if (synthRef.current) {
       synthRef.current.cancel();
       
@@ -176,10 +188,37 @@ export default function Home() {
       utterance.pitch = 1;
       utterance.volume = 1;
 
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        setIsProcessing(false);
+      };
+      
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        
+        // If user said they're done, end the conversation
+        if (shouldEndConversation) {
+          setTimeout(() => {
+            endConversation();
+          }, 1000);
+        } else if (inConversationMode) {
+          // Otherwise, automatically start listening again
+          setTimeout(() => {
+            if (recognitionRef.current && inConversationMode) {
+              try {
+                recognitionRef.current.start();
+                setIsListening(true);
+              } catch (error) {
+                console.error("Error restarting recognition:", error);
+              }
+            }
+          }, 500);
+        }
+      };
+      
       utterance.onerror = () => {
         setIsSpeaking(false);
+        setIsProcessing(false);
         setError("Could not speak the answer");
       };
 
@@ -342,7 +381,7 @@ export default function Home() {
         <div className="flex flex-col items-center gap-8 mb-12">
           <button
             onClick={startListening}
-            disabled={isListening || isProcessing || isSpeaking}
+            disabled={isListening || isProcessing || isSpeaking || inConversationMode}
             className={`
               w-64 h-64 rounded-full text-white text-4xl font-bold
               shadow-2xl transform transition-all duration-300
@@ -352,6 +391,8 @@ export default function Home() {
                 ? "bg-yellow-500 scale-105" 
                 : isSpeaking
                 ? "bg-green-500 scale-105 animate-pulse"
+                : inConversationMode
+                ? "bg-gray-400 scale-95"
                 : "bg-purple-600 hover:bg-purple-700 hover:scale-105"
               }
               disabled:opacity-50 disabled:cursor-not-allowed
@@ -373,15 +414,31 @@ export default function Home() {
                 <Volume2 className="w-16 h-16 animate-pulse" />
                 <span className="text-2xl">Speaking...</span>
               </div>
+            ) : inConversationMode ? (
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-2xl">In Progress...</span>
+              </div>
             ) : (
               "HELP"
             )}
           </button>
 
-          {isSpeaking && (
+          {inConversationMode && (
             <Button
               size="lg"
               variant="destructive"
+              onClick={endConversation}
+              className="text-2xl px-12 py-8 animate-pulse"
+            >
+              <X className="mr-2 h-8 w-8" />
+              DONE
+            </Button>
+          )}
+
+          {isSpeaking && (
+            <Button
+              size="lg"
+              variant="outline"
               onClick={stopSpeaking}
               className="text-xl px-8 py-6"
             >
