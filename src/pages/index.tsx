@@ -1,83 +1,64 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mic, Volume2, Loader2, MessageCircle, Trash2, AlertCircle } from "lucide-react";
+import { Mic, Volume2, Loader2, History, Trash2 } from "lucide-react";
 import { HelpCard } from "@/components/HelpCard";
+import { ThemeSwitch } from "@/components/ThemeSwitch";
+import type { ConversationItem } from "@/types";
+import { supabase } from "@/lib/supabase";
 
-interface ConversationItem {
-  question: string;
-  answer: string;
-  timestamp: Date;
-}
-
-export default function HomePage() {
+export default function Home() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [transcript, setTranscript] = useState("");
-  const [conversation, setConversation] = useState<ConversationItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [browserSupported, setBrowserSupported] = useState(true);
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [currentAnswer, setCurrentAnswer] = useState("");
+  const [error, setError] = useState("");
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
-  const transcriptRef = useRef("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       synthRef.current = window.speechSynthesis;
       
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        setBrowserSupported(false);
-        setError("Voice recognition not supported. Please use Chrome or Edge browser.");
-        return;
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = "en-US";
+
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setCurrentQuestion(transcript);
+          handleAskQuestion(transcript);
+        };
+
+        recognitionRef.current.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+          setError("Sorry, I couldn't hear you clearly. Please try again.");
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+        };
+      } else {
+        setError("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
       }
+    }
 
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = "en-US";
-
-      recognitionRef.current.onresult = (event: any) => {
-        const current = event.resultIndex;
-        const transcriptText = event.results[current][0].transcript;
-        setTranscript(transcriptText);
-        transcriptRef.current = transcriptText;
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-        const finalTranscript = transcriptRef.current.trim();
-        if (finalTranscript) {
-          handleQuestion(finalTranscript);
-        }
-        transcriptRef.current = "";
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-        if (event.error === "no-speech") {
-          setError("No speech detected. Please try again.");
-        } else if (event.error === "not-allowed") {
-          setError("Microphone permission denied. Please allow microphone access.");
-        } else {
-          setError("Voice recognition error. Please try again.");
-        }
-        setTimeout(() => setError(null), 5000);
-      };
-
-      const savedConversations = localStorage.getItem("aworkingbear-conversations");
-      if (savedConversations) {
-        try {
-          const parsed = JSON.parse(savedConversations);
-          setConversation(parsed.map((item: any) => ({
-            ...item,
-            timestamp: new Date(item.timestamp)
-          })));
-        } catch (e) {
-          console.error("Error loading saved conversations:", e);
-        }
+    // Load recent conversations from localStorage on mount
+    const saved = localStorage.getItem("conversations");
+    if (saved) {
+      try {
+        setConversations(JSON.parse(saved));
+      } catch (e) {
+        console.error("Error loading conversations:", e);
       }
     }
 
@@ -88,63 +69,74 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (conversation.length > 0) {
-      localStorage.setItem("aworkingbear-conversations", JSON.stringify(conversation.slice(0, 10)));
-    }
-  }, [conversation]);
+  const loadHistoryFromSupabase = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !isProcessing && browserSupported) {
-        e.preventDefault();
-        if (isListening) {
-          stopListening();
-        } else {
-          startListening();
-        }
+      if (error) throw error;
+
+      if (data) {
+        const formattedConversations: ConversationItem[] = data.map(item => ({
+          question: item.question,
+          answer: item.answer,
+          timestamp: new Date(item.created_at)
+        }));
+        setConversations(formattedConversations);
+        localStorage.setItem("conversations", JSON.stringify(formattedConversations));
       }
-    };
+    } catch (error) {
+      console.error("Error loading history:", error);
+      setError("Couldn't load conversation history");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [isListening, isProcessing, browserSupported]);
+  const clearHistory = async () => {
+    if (confirm("Are you sure you want to clear all conversation history?")) {
+      setConversations([]);
+      localStorage.removeItem("conversations");
+      // Optionally clear from Supabase too
+      try {
+        await supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (error) {
+        console.error("Error clearing Supabase history:", error);
+      }
+    }
+  };
 
   const startListening = () => {
-    if (!recognitionRef.current) {
-      setError("Voice recognition not available.");
-      return;
-    }
+    setError("");
+    setCurrentQuestion("");
+    setCurrentAnswer("");
     
-    setError(null);
-    setTranscript("");
-    transcriptRef.current = "";
-    setIsListening(true);
-    
-    try {
-      recognitionRef.current.start();
-    } catch (e) {
-      console.error("Error starting recognition:", e);
-      setIsListening(false);
-      setError("Could not start voice recognition. Please try again.");
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error("Error starting recognition:", error);
+        setError("Could not start listening. Please try again.");
+      }
     }
   };
 
-  const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-    }
-  };
-
-  const handleQuestion = async (question: string) => {
+  const handleAskQuestion = async (question: string) => {
     setIsProcessing(true);
-    setError(null);
-    
+    setError("");
+
     try {
       const response = await fetch("/api/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question })
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question }),
       });
 
       if (!response.ok) {
@@ -152,21 +144,22 @@ export default function HomePage() {
       }
 
       const data = await response.json();
+      setCurrentAnswer(data.answer);
       
-      const newItem: ConversationItem = {
+      const newConversation: ConversationItem = {
         question,
         answer: data.answer,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       
-      setConversation(prev => [newItem, ...prev]);
+      const updatedConversations = [newConversation, ...conversations].slice(0, 20);
+      setConversations(updatedConversations);
+      localStorage.setItem("conversations", JSON.stringify(updatedConversations));
+
       speakAnswer(data.answer);
-      setTranscript("");
     } catch (error) {
-      console.error("Error getting answer:", error);
-      const errorMsg = "I'm sorry, I had trouble getting an answer. Please try again.";
-      setError(errorMsg);
-      speakAnswer(errorMsg);
+      console.error("Error asking question:", error);
+      setError("Sorry, I had trouble processing that. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -180,202 +173,185 @@ export default function HomePage() {
       utterance.rate = 0.9;
       utterance.pitch = 1;
       utterance.volume = 1;
-      utterance.lang = "en-US";
-      
-      const voices = synthRef.current.getVoices();
-      const preferredVoice = voices.find(voice => 
-        voice.name.includes("Male") || voice.name.includes("Google US English")
-      );
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-      }
-      
+
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setError("Could not speak the answer");
+      };
+
       synthRef.current.speak(utterance);
     }
   };
 
-  const clearHistory = () => {
-    if (confirm("Are you sure you want to clear all conversation history?")) {
-      setConversation([]);
-      localStorage.removeItem("aworkingbear-conversations");
-    }
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-US", { 
-      hour: "numeric", 
-      minute: "2-digit",
-      hour12: true 
-    });
-  };
-
-  const formatDate = (date: Date) => {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    if (date.toDateString() === today.toDateString()) {
-      return "Today";
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return "Yesterday";
-    } else {
-      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const stopSpeaking = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl sm:text-6xl font-bold text-white mb-2">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
+      <div className="absolute top-4 right-4">
+        <ThemeSwitch />
+      </div>
+
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="text-center mb-8">
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-2">
             aworkingbear's Assistant
           </h1>
-          <p className="text-xl sm:text-2xl text-blue-200">Your AI-powered personal assistant</p>
-        </header>
-
-        <div className="mb-8">
-          <HelpCard />
+          <p className="text-xl text-gray-600 dark:text-gray-300">
+            Click HELP and ask me anything
+          </p>
         </div>
 
-        {!browserSupported && (
-          <Card className="p-6 mb-6 bg-red-50 border-red-200">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="text-lg font-semibold text-red-900 mb-1">Browser Not Supported</h3>
-                <p className="text-red-800">
-                  Please use Google Chrome or Microsoft Edge for the best experience with voice recognition.
-                </p>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {error && (
-          <Card className="p-4 mb-6 bg-yellow-50 border-yellow-200">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600" />
-              <p className="text-lg text-yellow-900">{error}</p>
-            </div>
-          </Card>
-        )}
-
-        <div className="flex flex-col items-center gap-6 mb-12">
+        <div className="flex justify-center mb-8 gap-4">
           <Button
-            onClick={isListening ? stopListening : startListening}
-            disabled={isProcessing || !browserSupported}
-            className={`w-56 h-56 sm:w-64 sm:h-64 rounded-full text-3xl font-bold shadow-2xl transition-all duration-300 ${
-              isListening 
-                ? "bg-red-500 hover:bg-red-600 scale-110 animate-pulse" 
-                : isProcessing
-                ? "bg-blue-500"
-                : "bg-emerald-500 hover:bg-emerald-600 hover:scale-105"
-            }`}
+            size="lg"
+            variant="outline"
+            onClick={() => {
+              setShowHistory(!showHistory);
+              if (!showHistory && conversations.length === 0) {
+                loadHistoryFromSupabase();
+              }
+            }}
+            className="text-lg"
           >
-            {isProcessing ? (
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-20 h-20 animate-spin" />
-                <span className="text-xl">Thinking...</span>
+            <History className="mr-2 h-5 w-5" />
+            {showHistory ? "Hide" : "Show"} History
+          </Button>
+          
+          {conversations.length > 0 && (
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={clearHistory}
+              className="text-lg"
+            >
+              <Trash2 className="mr-2 h-5 w-5" />
+              Clear History
+            </Button>
+          )}
+        </div>
+
+        {showHistory && (
+          <Card className="p-6 mb-8 max-h-96 overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">Conversation History</h2>
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
               </div>
-            ) : isListening ? (
-              <div className="flex flex-col items-center gap-4">
-                <Mic className="w-20 h-20" />
-                <span className="text-xl">Listening...</span>
-              </div>
+            ) : conversations.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No conversations yet</p>
             ) : (
-              <div className="flex flex-col items-center gap-4">
-                <MessageCircle className="w-20 h-20" />
-                <span className="text-2xl">HELP</span>
+              <div className="space-y-4">
+                {conversations.map((conv, index) => (
+                  <div key={index} className="border-b pb-4 last:border-b-0">
+                    <p className="font-semibold text-purple-600 mb-1">
+                      Q: {conv.question}
+                    </p>
+                    <p className="text-gray-700 dark:text-gray-300 mb-1">
+                      A: {conv.answer}
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      {new Date(conv.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
               </div>
             )}
-          </Button>
+          </Card>
+        )}
 
-          <p className="text-lg text-blue-100 text-center max-w-md">
-            {isListening 
-              ? "I'm listening... speak your question now" 
-              : isProcessing 
-              ? "Getting your answer..."
-              : "Press the button and ask your question"}
-          </p>
+        <div className="flex flex-col items-center gap-8">
+          <button
+            onClick={startListening}
+            disabled={isListening || isProcessing || isSpeaking}
+            className={`
+              w-64 h-64 rounded-full text-white text-4xl font-bold
+              shadow-2xl transform transition-all duration-300
+              ${isListening 
+                ? "bg-red-500 scale-110 animate-pulse" 
+                : isProcessing 
+                ? "bg-yellow-500 scale-105" 
+                : isSpeaking
+                ? "bg-green-500 scale-105 animate-pulse"
+                : "bg-purple-600 hover:bg-purple-700 hover:scale-105"
+              }
+              disabled:opacity-50 disabled:cursor-not-allowed
+              focus:outline-none focus:ring-4 focus:ring-purple-300
+            `}
+          >
+            {isListening ? (
+              <div className="flex flex-col items-center gap-2">
+                <Mic className="w-16 h-16 animate-pulse" />
+                <span className="text-2xl">Listening...</span>
+              </div>
+            ) : isProcessing ? (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="w-16 h-16 animate-spin" />
+                <span className="text-2xl">Thinking...</span>
+              </div>
+            ) : isSpeaking ? (
+              <div className="flex flex-col items-center gap-2">
+                <Volume2 className="w-16 h-16 animate-pulse" />
+                <span className="text-2xl">Speaking...</span>
+              </div>
+            ) : (
+              "HELP"
+            )}
+          </button>
 
-          {transcript && (
-            <Card className="p-6 w-full max-w-2xl bg-white/90 backdrop-blur shadow-lg">
-              <p className="text-2xl text-gray-700">
-                <strong className="text-emerald-600">You said:</strong> {transcript}
+          {isSpeaking && (
+            <Button
+              size="lg"
+              variant="destructive"
+              onClick={stopSpeaking}
+              className="text-xl px-8 py-6"
+            >
+              Stop Speaking
+            </Button>
+          )}
+
+          {error && (
+            <Card className="p-6 bg-red-50 dark:bg-red-900/20 border-red-200">
+              <p className="text-red-600 dark:text-red-400 text-lg font-semibold text-center">
+                {error}
               </p>
             </Card>
           )}
 
-          {isSpeaking && (
-            <div className="flex items-center gap-3 text-blue-100 bg-blue-600/50 backdrop-blur px-6 py-3 rounded-full">
-              <Volume2 className="w-8 h-8 animate-pulse" />
-              <span className="text-xl font-medium">Speaking answer...</span>
-            </div>
-          )}
-        </div>
-
-        {conversation.length > 0 && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold text-white">Recent Conversations</h2>
-              <Button
-                onClick={clearHistory}
-                variant="outline"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Clear History
-              </Button>
-            </div>
-            {conversation.map((item, index) => (
-              <Card key={index} className="p-6 sm:p-8 bg-white/90 backdrop-blur shadow-lg hover:shadow-xl transition-shadow">
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-sm font-medium text-gray-500">
-                        {formatDate(item.timestamp)} at {formatTime(item.timestamp)}
-                      </span>
-                    </div>
-                    <p className="text-xl sm:text-2xl text-gray-700 mb-2">
-                      <strong className="text-emerald-600">Q:</strong> {item.question}
-                    </p>
-                  </div>
-                  <div className="border-t pt-4">
-                    <p className="text-xl sm:text-2xl text-gray-800 leading-relaxed">
-                      <strong className="text-blue-600">A:</strong> {item.answer}
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => speakAnswer(item.answer)}
-                    variant="outline"
-                    size="lg"
-                    className="mt-4 text-lg"
-                    disabled={isSpeaking}
-                  >
-                    <Volume2 className="w-5 h-5 mr-2" />
-                    Repeat Answer
-                  </Button>
+          {currentQuestion && (
+            <Card className="p-6 w-full max-w-2xl">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                    Your Question:
+                  </p>
+                  <p className="text-xl font-semibold text-purple-600 dark:text-purple-400">
+                    {currentQuestion}
+                  </p>
                 </div>
-              </Card>
-            ))}
-          </div>
-        )}
+                
+                {currentAnswer && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                      Answer:
+                    </p>
+                    <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
+                      {currentAnswer}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
 
-        {conversation.length === 0 && !isListening && !isProcessing && (
-          <Card className="p-8 bg-white/80 backdrop-blur text-center">
-            <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-2xl font-semibold text-gray-700 mb-2">
-              No conversations yet
-            </h3>
-            <p className="text-xl text-gray-600">
-              Press the HELP button above to ask your first question!
-            </p>
-          </Card>
-        )}
+          <HelpCard />
+        </div>
       </div>
     </div>
   );

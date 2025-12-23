@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { supabase } from "@/lib/supabase";
 
 type ResponseData = {
   answer: string;
@@ -25,12 +26,39 @@ export default async function handler(
 
   try {
     const answer = await getAnswerWithRetry(question);
+    
+    // Save to Supabase
+    await saveConversation(question, answer);
+    
     return res.status(200).json({ answer });
   } catch (error) {
     console.error("Error processing question:", error);
     return res.status(500).json({ 
       error: "I'm having trouble right now. Please try asking again in a moment." 
     });
+  }
+}
+
+async function saveConversation(question: string, answer: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('conversations')
+      .insert({
+        question,
+        answer,
+        metadata: {
+          model: 'gpt-3.5-turbo',
+          timestamp: new Date().toISOString()
+        }
+      });
+    
+    if (error) {
+      console.error("Error saving to Supabase:", error);
+      // Don't throw - we still want to return the answer even if save fails
+    }
+  } catch (error) {
+    console.error("Error saving conversation:", error);
+    // Non-blocking error
   }
 }
 
