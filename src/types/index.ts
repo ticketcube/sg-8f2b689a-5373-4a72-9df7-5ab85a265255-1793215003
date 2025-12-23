@@ -1,4 +1,3 @@
-
 export interface ConversationItem {
   question: string;
   answer: string;
@@ -40,4 +39,20 @@ export interface EmailDraftContent {
   recipient: string;
   subject: string;
   body: string;
+}
+
+export interface Message {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  type: "shopping" | "moving" | "email" | "general";
+  status: "active" | "saved";
+  created_at: string;
+  updated_at: string;
 }
