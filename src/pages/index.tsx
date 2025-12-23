@@ -208,11 +208,14 @@ export default function Home() {
               try {
                 recognitionRef.current.start();
                 setIsListening(true);
+                console.log("Auto-restarted listening");
               } catch (error) {
                 console.error("Error restarting recognition:", error);
+                // Fallback: user can click HELP button again
+                setError("Click HELP to continue...");
               }
             }
-          }, 500);
+          }, 800); // Increased delay to 800ms
         }
       };
       
@@ -381,7 +384,7 @@ export default function Home() {
         <div className="flex flex-col items-center gap-8 mb-12">
           <button
             onClick={startListening}
-            disabled={isListening || isProcessing || isSpeaking || inConversationMode}
+            disabled={isListening || isProcessing || isSpeaking}
             className={`
               w-64 h-64 rounded-full text-white text-4xl font-bold
               shadow-2xl transform transition-all duration-300
@@ -392,7 +395,7 @@ export default function Home() {
                 : isSpeaking
                 ? "bg-green-500 scale-105 animate-pulse"
                 : inConversationMode
-                ? "bg-gray-400 scale-95"
+                ? "bg-blue-500 hover:bg-blue-600 hover:scale-105"
                 : "bg-purple-600 hover:bg-purple-700 hover:scale-105"
               }
               disabled:opacity-50 disabled:cursor-not-allowed
@@ -416,7 +419,8 @@ export default function Home() {
               </div>
             ) : inConversationMode ? (
               <div className="flex flex-col items-center gap-2">
-                <span className="text-2xl">In Progress...</span>
+                <Mic className="w-12 h-12" />
+                <span className="text-xl">Click to Continue</span>
               </div>
             ) : (
               "HELP"
