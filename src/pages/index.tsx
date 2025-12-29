@@ -32,24 +32,92 @@ export default function Home() {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
+        recognitionRef.current.continuous = true;  // Keep listening
+        recognitionRef.current.interimResults = true;  // Show partial results
         recognitionRef.current.lang = "en-US";
+        recognitionRef.current.maxAlternatives = 1;
+
+        recognitionRef.current.onstart = () => {
+          console.log("🎤 Speech recognition STARTED");
+          setIsListening(true);
+        };
 
         recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setCurrentQuestion(transcript);
-          handleConversationMessage(transcript);
+          console.log("🎤 Speech detected! Event:", event);
+          
+          // Get the most recent result
+          const resultIndex = event.resultIndex;
+          const result = event.results[resultIndex];
+          
+          console.log("Result details:", {
+            isFinal: result.isFinal,
+            confidence: result[0].confidence,
+            transcript: result[0].transcript
+          });
+
+          // Only process final results
+          if (result.isFinal) {
+            const transcript = result[0].transcript;
+            console.log("✅ Final transcript:", transcript);
+            
+            // Stop listening after getting final result
+            if (recognitionRef.current) {
+              recognitionRef.current.stop();
+            }
+            
+            setCurrentQuestion(transcript);
+            handleConversationMessage(transcript);
+          } else {
+            console.log("⏳ Interim result:", result[0].transcript);
+          }
         };
 
         recognitionRef.current.onerror = (event: any) => {
-          console.error("Speech recognition error:", event.error);
-          setError("Sorry, I couldn't hear you clearly. Please try again.");
+          console.error("❌ Speech recognition error:", event.error);
+          console.error("Error details:", event);
+          
+          let errorMessage = "Sorry, I couldn't hear you clearly. ";
+          
+          switch(event.error) {
+            case 'no-speech':
+              errorMessage += "No speech detected. Please try again and speak clearly.";
+              break;
+            case 'audio-capture':
+              errorMessage += "Microphone not accessible. Check permissions.";
+              break;
+            case 'not-allowed':
+              errorMessage += "Microphone permission denied. Please allow access.";
+              break;
+            case 'network':
+              errorMessage += "Network error. Check your connection.";
+              break;
+            default:
+              errorMessage += `Error: ${event.error}`;
+          }
+          
+          setError(errorMessage);
           setIsListening(false);
         };
 
         recognitionRef.current.onend = () => {
+          console.log("🛑 Speech recognition ended");
           setIsListening(false);
+        };
+
+        recognitionRef.current.onspeechstart = () => {
+          console.log("🗣️ Speech detected - user is speaking!");
+        };
+
+        recognitionRef.current.onspeechend = () => {
+          console.log("🤫 Speech ended - user stopped speaking");
+        };
+
+        recognitionRef.current.onaudiostart = () => {
+          console.log("🔊 Audio capture started");
+        };
+
+        recognitionRef.current.onaudioend = () => {
+          console.log("🔇 Audio capture ended");
         };
       } else {
         setError("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
