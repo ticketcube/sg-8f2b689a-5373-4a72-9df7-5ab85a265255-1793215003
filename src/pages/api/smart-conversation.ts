@@ -141,6 +141,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
         if (error) {
           console.error("Error updating conversation:", error);
+          throw error;
         }
       } else {
         // Create new conversation
@@ -157,19 +158,25 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
         if (error) {
           console.error("Error creating conversation:", error);
-        } else {
-          // Return the new conversation ID so frontend can track it
-          return res.status(200).json({
-            response: aiResponse,
-            conversationType,
-            userIsDone,
-            conversationId: data.id,
-          });
+          throw error;
         }
+
+        // Return the new conversation ID so frontend can track it
+        return res.status(200).json({
+          response: aiResponse,
+          conversationType,
+          userIsDone,
+          conversationId: data.id,
+          title: data.title,
+          messages: updatedMessages,
+        });
       }
     } catch (dbError) {
       console.error("Database error:", dbError);
-      // Continue even if database save fails
+      return res.status(500).json({
+        error: "Failed to save conversation to database",
+        details: dbError instanceof Error ? dbError.message : "Unknown error",
+      });
     }
 
     return res.status(200).json({
@@ -177,6 +184,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       conversationType,
       userIsDone,
       conversationId,
+      messages: updatedMessages,
     });
 
   } catch (error: any) {
