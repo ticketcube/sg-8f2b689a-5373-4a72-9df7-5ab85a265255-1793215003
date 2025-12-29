@@ -90,32 +90,41 @@ export type Database = {
       conversations: {
         Row: {
           answer: string
-          created_at: string | null
+          created_at: string
           id: string
+          messages: Json
           metadata: Json | null
           question: string
+          status: string
           title: string | null
-          updated_at: string | null
+          type: string
+          updated_at: string
           user_id: string | null
         }
         Insert: {
           answer: string
-          created_at?: string | null
+          created_at?: string
           id?: string
+          messages?: Json
           metadata?: Json | null
           question: string
+          status?: string
           title?: string | null
-          updated_at?: string | null
+          type?: string
+          updated_at?: string
           user_id?: string | null
         }
         Update: {
           answer?: string
-          created_at?: string | null
+          created_at?: string
           id?: string
+          messages?: Json
           metadata?: Json | null
           question?: string
+          status?: string
           title?: string | null
-          updated_at?: string | null
+          type?: string
+          updated_at?: string
           user_id?: string | null
         }
         Relationships: []

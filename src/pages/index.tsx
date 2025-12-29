@@ -153,7 +153,9 @@ export default function Home() {
         body: JSON.stringify({ 
           message,
           conversationMessages: activeConversation.messages,
-          mode
+          mode,
+          conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
+          conversationTitle: activeConversation.title
         }),
       });
 
@@ -170,19 +172,20 @@ export default function Home() {
         const updatedConversation = {
           ...activeConversation,
           title: data.response,
+          id: data.conversationId || activeConversation.id,
         };
-        await saveConversationToDatabase(updatedConversation);
         setActiveConversation(updatedConversation);
         setConversationMode("active");
         speakAnswer(`Title changed to ${data.response}`);
+        await loadConversations();
         return;
       }
 
       if (conversationMode === "saving") {
         // Check if user confirmed save
         if (/yes|sure|yeah|ok|save/i.test(message)) {
-          await saveConversationToDatabase(activeConversation);
           speakAnswer("Conversation saved! Starting a new conversation.");
+          await loadConversations();
           setTimeout(() => {
             startNewConversation();
           }, 2000);
@@ -193,32 +196,18 @@ export default function Home() {
         return;
       }
 
-      // Regular conversation flow
-      const newMessage: Message = {
-        role: "user",
-        content: message,
-        timestamp: new Date(),
-      };
-
-      const aiMessage: Message = {
-        role: "assistant",
-        content: data.response,
-        timestamp: new Date(),
-      };
-
+      // Regular conversation flow - update with saved conversation ID
       const updatedConversation = {
         ...activeConversation,
-        messages: [...activeConversation.messages, newMessage, aiMessage],
+        id: data.conversationId || activeConversation.id,
+        title: data.title || activeConversation.title,
+        messages: data.messages || activeConversation.messages,
         type: data.conversationType || activeConversation.type,
         updated_at: new Date().toISOString(),
       };
 
-      // Auto-generate title from first user message
-      if (activeConversation.messages.length === 0) {
-        updatedConversation.title = message.slice(0, 50);
-      }
-
       setActiveConversation(updatedConversation);
+      await loadConversations();
 
       // Check if user indicated they're done
       if (data.userIsDone) {
