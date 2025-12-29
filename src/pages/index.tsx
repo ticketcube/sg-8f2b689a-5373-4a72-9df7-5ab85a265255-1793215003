@@ -511,35 +511,44 @@ export default function Home() {
               </Button>
 
               <div className="space-y-2">
-                {conversations.map((conv) => (
-                  <Card
-                    key={conv.id}
-                    className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${
-                      activeConversation?.id === conv.id ? "ring-2 ring-purple-500" : ""
-                    }`}
-                    onClick={() => resumeConversation(conv)}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2 flex-1">
-                        {getItemIcon(conv.type)}
-                        <h3 className="text-lg font-semibold line-clamp-1">{conv.title}</h3>
+                {conversations.map((conv) => {
+                  const messageCount = Array.isArray(conv.messages)
+                    ? conv.messages.length
+                    : 0;
+
+                  return (
+                    <Card
+                      key={conv.id}
+                      className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${
+                        activeConversation?.id === conv.id ? "ring-2 ring-purple-500" : ""
+                      }`}
+                      onClick={() => resumeConversation(conv)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          {getItemIcon(conv.type)}
+                          <h3 className="text-lg font-semibold line-clamp-1">{conv.title}</h3>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteConversation(conv.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteConversation(conv.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      {conv.messages.length} messages • {new Date(conv.updated_at).toLocaleDateString()}
-                    </p>
-                  </Card>
-                ))}
+                      <p className="text-sm text-gray-500">
+                        {messageCount} messages{" "}
+                        {conv.updated_at
+                          ? `• ${new Date(conv.updated_at).toLocaleDateString()}`
+                          : ""}
+                      </p>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -654,23 +663,27 @@ export default function Home() {
                 </Card>
               )}
 
-              {activeConversation && activeConversation.messages.length > 0 && (
-                <Card className="p-6 w-full max-w-2xl">
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {activeConversation.messages.map((msg, index) => (
-                      <div key={index} className={msg.role === "user" ? "text-right" : "text-left"}>
-                        <div className={`inline-block p-4 rounded-lg ${
-                          msg.role === "user" 
-                            ? "bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100" 
-                            : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        }`}>
-                          <p className="text-lg">{msg.content}</p>
+              {activeConversation &&
+                Array.isArray(activeConversation.messages) &&
+                activeConversation.messages.length > 0 && (
+                  <Card className="p-6 w-full max-w-2xl">
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {activeConversation.messages.map((msg, index) => (
+                        <div key={index} className={msg.role === "user" ? "text-right" : "text-left"}>
+                          <div
+                            className={`inline-block p-4 rounded-lg ${
+                              msg.role === "user"
+                                ? "bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100"
+                                : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                            }`}
+                          >
+                            <p className="text-lg">{msg.content}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                      ))}
+                    </div>
+                  </Card>
+                )}
             </div>
 
             {savedItems.length > 0 && (
