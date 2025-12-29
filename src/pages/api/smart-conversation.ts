@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import OpenAI from "openai";
+import { supabase } from "@/lib/supabase";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -19,7 +20,7 @@ export default async function handler(
   }
 
   try {
-    const { message, conversationMessages = [], mode = "conversation" } = req.body;
+    const { message, conversationMessages = [], mode = "conversation", conversationId } = req.body;
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Message is required" });
@@ -106,10 +107,76 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     // Check if user indicates they're done
     const userIsDone = /\b(that'?s all|i'?m done|that'?s everything|finished|that'?s it)\b/i.test(message);
 
+    // Build updated messages array for database
+    const updatedMessages = [
+      ...conversationMessages,
+      {
+        role: "user",
+        content: message,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        role: "assistant",
+        content: aiResponse,
+        timestamp: new Date().toISOString(),
+      },
+    ];
+
+    // Generate a title from the first user message if this is a new conversation
+    const title = conversationMessages.length === 0 
+      ? message.slice(0, 50) + (message.length > 50 ? "..." : "")
+      : undefined;
+
+    // Save or update conversation in database
+    try {
+      if (conversationId) {
+        // Update existing conversation
+        const { error } = await supabase
+          .from("conversations")
+          .update({
+            messages: updatedMessages,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", conversationId);
+
+        if (error) {
+          console.error("Error updating conversation:", error);
+        }
+      } else {
+        // Create new conversation
+        const { data, error } = await supabase
+          .from("conversations")
+          .insert({
+            title: title || "New Conversation",
+            messages: updatedMessages,
+            type: conversationType,
+            status: "active",
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Error creating conversation:", error);
+        } else {
+          // Return the new conversation ID so frontend can track it
+          return res.status(200).json({
+            response: aiResponse,
+            conversationType,
+            userIsDone,
+            conversationId: data.id,
+          });
+        }
+      }
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+      // Continue even if database save fails
+    }
+
     return res.status(200).json({
       response: aiResponse,
       conversationType,
       userIsDone,
+      conversationId,
     });
 
   } catch (error: any) {
