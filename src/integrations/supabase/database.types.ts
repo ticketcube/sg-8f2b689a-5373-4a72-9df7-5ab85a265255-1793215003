@@ -89,12 +89,10 @@ export type Database = {
       }
       conversations: {
         Row: {
-          answer: string
           created_at: string
           id: string
           messages: Json
           metadata: Json | null
-          question: string
           status: string
           title: string | null
           type: string
@@ -102,12 +100,10 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          answer: string
           created_at?: string
           id?: string
           messages?: Json
           metadata?: Json | null
-          question: string
           status?: string
           title?: string | null
           type?: string
@@ -115,12 +111,10 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          answer?: string
           created_at?: string
           id?: string
           messages?: Json
           metadata?: Json | null
-          question?: string
           status?: string
           title?: string | null
           type?: string
