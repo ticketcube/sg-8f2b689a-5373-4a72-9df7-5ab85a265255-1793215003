@@ -118,21 +118,30 @@ export default function Home() {
     }
 
     setError("");
+    console.log("Starting voice recognition...");
     
     if (recognitionRef.current) {
       try {
         recognitionRef.current.start();
         setIsListening(true);
+        console.log("Voice recognition started successfully");
       } catch (error) {
         console.error("Error starting recognition:", error);
         setError("Could not start listening. Please try again.");
       }
+    } else {
+      console.error("Speech recognition not initialized");
+      setError("Speech recognition is not available in your browser");
     }
   };
 
   const handleConversationMessage = async (message: string) => {
-    if (!activeConversation) return;
+    if (!activeConversation) {
+      console.error("No active conversation");
+      return;
+    }
 
+    console.log("Processing message:", message);
     setIsProcessing(true);
     setError("");
 
@@ -144,6 +153,13 @@ export default function Home() {
       } else if (conversationMode === "editing_title") {
         mode = "title_edit";
       }
+
+      console.log("Sending to API:", {
+        message,
+        conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
+        mode,
+        messageCount: activeConversation.messages.length
+      });
 
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
@@ -160,15 +176,17 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to get answer");
+        const errorData = await response.json();
+        console.error("API error response:", errorData);
+        throw new Error(errorData.error || "Failed to get answer");
       }
 
       const data = await response.json();
+      console.log("API response:", data);
       setCurrentAnswer(data.response);
 
       // Handle different modes
       if (conversationMode === "editing_title") {
-        // Update conversation title
         const updatedConversation = {
           ...activeConversation,
           title: data.response,
@@ -182,7 +200,6 @@ export default function Home() {
       }
 
       if (conversationMode === "saving") {
-        // Check if user confirmed save
         if (/yes|sure|yeah|ok|save/i.test(message)) {
           speakAnswer("Conversation saved! Starting a new conversation.");
           await loadConversations();
@@ -205,6 +222,12 @@ export default function Home() {
         type: data.conversationType || activeConversation.type,
         updated_at: new Date().toISOString(),
       };
+
+      console.log("Updated conversation:", {
+        id: updatedConversation.id,
+        title: updatedConversation.title,
+        messageCount: updatedConversation.messages.length
+      });
 
       setActiveConversation(updatedConversation);
       await loadConversations();
