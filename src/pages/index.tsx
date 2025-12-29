@@ -513,6 +513,28 @@ export default function Home() {
             <div className="p-6">
               <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Conversations</h2>
               
+              {/* OpenAI Test Button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/test-openai');
+                    const data = await response.json();
+                    if (data.success) {
+                      alert(`✅ OpenAI is working!\n\nResponse: ${data.response}\nModel: ${data.model}`);
+                    } else {
+                      alert(`❌ OpenAI Error:\n\n${data.error}\n\n${data.details || ''}`);
+                    }
+                  } catch (error) {
+                    alert('❌ Failed to test OpenAI API');
+                  }
+                }}
+                className="w-full mb-4 text-sm"
+              >
+                🧪 Test OpenAI API
+              </Button>
+              
               <Button
                 size="lg"
                 onClick={startNewConversation}
@@ -520,6 +542,22 @@ export default function Home() {
               >
                 <Plus className="mr-2 h-5 w-5" />
                 New Conversation
+              </Button>
+
+              {/* Microphone Test Button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (recognitionRef.current) {
+                    alert('✅ Speech Recognition is initialized!\n\nYour browser supports voice input.');
+                  } else {
+                    alert('❌ Speech Recognition NOT initialized\n\nPlease use Chrome or Edge browser.');
+                  }
+                }}
+                className="w-full mb-4 text-sm"
+              >
+                🎤 Test Microphone Setup
               </Button>
 
               <div className="space-y-2">
