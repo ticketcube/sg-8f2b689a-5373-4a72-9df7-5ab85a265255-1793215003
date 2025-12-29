@@ -28,7 +28,7 @@ export default async function handler(
   try {
     const result = await getAnswerWithRetry(question);
     
-    // Save to Supabase
+    // Save to Supabase (no auth required since RLS is disabled)
     await saveConversation(question, result.answer, result.usedAI);
     
     return res.status(200).json(result);
@@ -56,11 +56,9 @@ async function saveConversation(question: string, answer: string, usedAI?: boole
     
     if (error) {
       console.error("Error saving to Supabase:", error);
-      // Don't throw - we still want to return the answer even if save fails
     }
   } catch (error) {
     console.error("Error saving conversation:", error);
-    // Non-blocking error
   }
 }
 
@@ -73,7 +71,6 @@ async function getAnswerWithRetry(question: string, retries = 2): Promise<Respon
       await new Promise(resolve => setTimeout(resolve, 1000));
       return getAnswerWithRetry(question, retries - 1);
     }
-    // If all retries fail, fall back to basic answer
     console.error("All retries failed, using basic answer:", error);
     return {
       answer: await getBasicAnswer(question),
@@ -85,7 +82,6 @@ async function getAnswerWithRetry(question: string, retries = 2): Promise<Respon
 async function getAnswer(question: string): Promise<ResponseData> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
   
-  // Check if API key exists and is valid format
   if (!openaiApiKey || !openaiApiKey.startsWith('sk-')) {
     console.log("No valid OpenAI API key found, using basic answer");
     return {
@@ -94,7 +90,6 @@ async function getAnswer(question: string): Promise<ResponseData> {
     };
   }
   
-  // Try OpenAI first
   try {
     const answer = await askGPT(question, openaiApiKey);
     return {
@@ -124,7 +119,7 @@ async function askGPT(question: string, apiKey: string): Promise<string> {
       messages: [
         {
           role: "system",
-          content: "You are a helpful, knowledgeable assistant for aworkingbear. Provide clear, concise, and accurate answers. Be friendly and professional. Keep answers under 150 words unless asked for more detail. Speak naturally as if talking to a friend."
+          content: "You are a helpful, knowledgeable assistant for Lois. Provide clear, concise, and accurate answers. Be friendly and professional. Keep answers under 150 words unless asked for more detail. Speak naturally as if talking to a friend."
         },
         {
           role: "user",
@@ -169,33 +164,5 @@ async function getBasicAnswer(question: string): Promise<string> {
     return `Today is ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`;
   }
 
-  if (lowerQuestion.includes("shabbat") || lowerQuestion.includes("sabbath")) {
-    return "Shabbat is the Jewish day of rest, beginning Friday evening at sunset and ending Saturday evening when three stars appear in the sky. It's a time for rest, prayer, and family.";
-  }
-
-  if (lowerQuestion.includes("passover") || lowerQuestion.includes("pesach")) {
-    return "Passover is a major Jewish holiday celebrating the Israelites' exodus from slavery in Egypt. It lasts 7-8 days and includes the Seder meal with symbolic foods and the retelling of the Exodus story.";
-  }
-
-  if (lowerQuestion.includes("rosh hashanah")) {
-    return "Rosh Hashanah is the Jewish New Year, a time of reflection and renewal. It's celebrated with apples and honey (symbolizing a sweet new year), special prayers, and the blowing of the shofar.";
-  }
-
-  if (lowerQuestion.includes("yom kippur")) {
-    return "Yom Kippur is the Day of Atonement, the holiest day in Judaism. It's a day of fasting and prayer, asking for forgiveness for the past year's sins.";
-  }
-
-  if (lowerQuestion.includes("emergency") || lowerQuestion.includes("911")) {
-    return "For emergencies, always call 911 immediately. For medical questions, please consult with your doctor or healthcare provider.";
-  }
-
-  if (lowerQuestion.includes("medicine") || lowerQuestion.includes("medication")) {
-    return "For questions about your medications, please speak with your doctor or pharmacist. They have your medical history and can give you the best advice.";
-  }
-
-  if (lowerQuestion.includes("help") && !lowerQuestion.includes("can you help")) {
-    return "I'm here to help! You can ask me about general topics, the time and date, or I can provide friendly conversation. What would you like to know?";
-  }
-
-  return `I heard your question: "${question}"\n\nI can help with:\n• Time and date\n• General conversation\n• Emergency numbers (911)\n\nNote: I'm currently using basic responses. To get smarter AI answers, make sure your OpenAI API key is properly configured in the environment settings.`;
+  return `I heard your question: "${question}"\n\nI can help with:\n• Time and date\n• General conversation\n• Questions and answers\n\nNote: To get smarter AI answers, make sure your OpenAI API key is properly configured.`;
 }
