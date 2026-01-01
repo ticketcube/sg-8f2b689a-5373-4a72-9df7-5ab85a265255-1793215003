@@ -614,18 +614,36 @@ export default function Home() {
 
               {/* Microphone Test Button */}
               <Button
-                size="sm"
+                size="lg"
                 variant="outline"
-                onClick={() => {
-                  if (recognitionRef.current) {
-                    alert('✅ Speech Recognition is initialized!\n\nYour browser supports voice input.');
-                  } else {
-                    alert('❌ Speech Recognition NOT initialized\n\nPlease use Chrome or Edge browser.');
+                onClick={testMicrophone}
+                className="w-full mb-4 text-sm"
+              >
+                🎤 Test Microphone Setup
+              </Button>
+
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const response = await fetch("/api/test-save", {
+                      method: "POST",
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                      alert(`✅ Database save works! Conversation ID: ${data.conversationId}`);
+                      await loadConversations();
+                    } else {
+                      alert(`❌ Database save failed: ${data.error}`);
+                    }
+                  } catch (error: any) {
+                    alert(`❌ Test failed: ${error.message}`);
                   }
                 }}
                 className="w-full mb-4 text-sm"
               >
-                🎤 Test Microphone Setup
+                💾 Test Database Save
               </Button>
 
               <div className="space-y-2">
