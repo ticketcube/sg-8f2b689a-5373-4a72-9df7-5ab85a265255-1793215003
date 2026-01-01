@@ -218,116 +218,111 @@ export default function Home() {
   };
 
   const handleConversationMessage = async (message: string) => {
-    if (!activeConversation) {
-      console.error("No active conversation");
+    console.log("📝 handleConversationMessage called with:", message);
+    console.log("📋 Current activeConversation:", activeConversation);
+    console.log("🎯 Current conversationMode:", conversationMode);
+
+    if (!message.trim()) {
+      console.warn("⚠️ Empty message, ignoring");
       return;
     }
 
-    console.log("Processing message:", message);
     setIsProcessing(true);
-    setError("");
+    setError(null);
 
     try {
-      let mode = "conversation";
+      console.log("🚀 Starting conversation message processing...");
       
-      if (conversationMode === "saving") {
-        mode = "save_prompt";
-      } else if (conversationMode === "editing_title") {
-        mode = "title_edit";
-      }
+      // Add user message to conversation
+      const userMessage: Message = {
+        role: "user",
+        content: message,
+        timestamp: new Date(),
+      };
 
-      console.log("Sending to API:", {
+      const updatedMessages = [...activeConversation.messages, userMessage];
+      console.log("💬 Updated messages array:", updatedMessages);
+
+      setActiveConversation((prev) => ({
+        ...prev,
+        messages: updatedMessages,
+      }));
+
+      console.log("📡 Preparing API call to /api/smart-conversation");
+      console.log("📦 API Request body:", {
         message,
-        conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
-        mode,
-        messageCount: activeConversation.messages.length
+        conversationId: activeConversation.id !== "temp" ? activeConversation.id : null,
+        existingMessages: activeConversation.messages,
+        conversationType: activeConversation.type,
+        userIsDone: false,
       });
 
+      // Call smart conversation API
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           message,
-          conversationMessages: activeConversation.messages,
-          mode,
-          conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
-          conversationTitle: activeConversation.title
+          conversationId: activeConversation.id !== "temp" ? activeConversation.id : null,
+          existingMessages: activeConversation.messages,
+          conversationType: activeConversation.type,
+          userIsDone: false,
         }),
       });
 
+      console.log("📬 API Response status:", response.status);
+      console.log("📬 API Response OK:", response.ok);
+
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("API error response:", errorData);
-        throw new Error(errorData.error || "Failed to get answer");
+        console.error("❌ API Error response:", errorData);
+        throw new Error(errorData.error || "Failed to process message");
       }
 
       const data = await response.json();
-      console.log("API response:", data);
-      setCurrentAnswer(data.response);
+      console.log("✅ API Response data:", data);
+      console.log("🆔 Conversation ID from API:", data.conversationId);
+      console.log("📝 Title from API:", data.title);
+      console.log("💬 Messages from API:", data.messages);
 
-      // Handle different modes
-      if (conversationMode === "editing_title") {
-        const updatedConversation = {
-          ...activeConversation,
-          title: data.response,
-          id: data.conversationId || activeConversation.id,
-        };
-        setActiveConversation(updatedConversation);
-        setConversationMode("active");
-        speakAnswer(`Title changed to ${data.response}`);
-        await loadConversations();
-        return;
-      }
+      // Add assistant response to conversation
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: data.response,
+        timestamp: new Date(),
+      };
 
-      if (conversationMode === "saving") {
-        if (/yes|sure|yeah|ok|save/i.test(message)) {
-          speakAnswer("Conversation saved! Starting a new conversation.");
-          await loadConversations();
-          setTimeout(() => {
-            startNewConversation();
-          }, 2000);
-        } else {
-          setConversationMode("active");
-          speakAnswer(data.response);
-        }
-        return;
-      }
+      const finalMessages = [...updatedMessages, assistantMessage];
+      console.log("📚 Final messages array:", finalMessages);
 
-      // Regular conversation flow - update with saved conversation ID
+      // Update conversation with response and save to database
       const updatedConversation = {
         ...activeConversation,
         id: data.conversationId || activeConversation.id,
         title: data.title || activeConversation.title,
-        messages: data.messages || activeConversation.messages,
+        messages: data.messages || finalMessages,
         type: data.conversationType || activeConversation.type,
         updated_at: new Date().toISOString(),
       };
 
-      console.log("Updated conversation:", {
-        id: updatedConversation.id,
-        title: updatedConversation.title,
-        messageCount: updatedConversation.messages.length
-      });
-
+      console.log("🔄 Setting active conversation to:", updatedConversation);
       setActiveConversation(updatedConversation);
-      await loadConversations();
 
-      // Check if user indicated they're done
-      if (data.userIsDone) {
-        setConversationMode("ending");
-        speakAnswer(data.response + " Should I save this conversation?");
-        setTimeout(() => {
-          setConversationMode("saving");
-        }, 2000);
-      } else {
+      console.log("🔃 Reloading conversations list...");
+      await loadConversations();
+      console.log("✅ Conversations list reloaded");
+
+      // Speak the response
+      if (data.response) {
+        console.log("🔊 Speaking response:", data.response.substring(0, 50) + "...");
         speakAnswer(data.response);
       }
-
-    } catch (error) {
-      console.error("Error in conversation:", error);
+    } catch (error: any) {
+      console.error("❌ Error in handleConversationMessage:", error);
+      console.error("❌ Error stack:", error.stack);
       setError("Sorry, I had trouble processing that. Please try again.");
+    } finally {
+      console.log("🏁 Processing complete, setting isProcessing to false");
       setIsProcessing(false);
     }
   };
