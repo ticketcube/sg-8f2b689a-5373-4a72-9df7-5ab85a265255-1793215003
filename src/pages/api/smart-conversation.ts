@@ -131,6 +131,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     try {
       if (conversationId) {
         // Update existing conversation
+        console.log("🔄 Updating conversation:", conversationId);
         const { error } = await supabase
           .from("conversations")
           .update({
@@ -140,11 +141,14 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
           .eq("id", conversationId);
 
         if (error) {
-          console.error("Error updating conversation:", error);
+          console.error("❌ Error updating conversation:", error);
           throw error;
         }
+        console.log("✅ Conversation updated successfully");
       } else {
         // Create new conversation
+        console.log("📝 Creating new conversation with title:", title || "New Conversation");
+        console.log("📝 Messages to save:", updatedMessages.length, "messages");
         const { data, error } = await supabase
           .from("conversations")
           .insert({
@@ -157,9 +161,12 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
           .single();
 
         if (error) {
-          console.error("Error creating conversation:", error);
+          console.error("❌ Error creating conversation:", error);
+          console.error("❌ Error details:", JSON.stringify(error, null, 2));
           throw error;
         }
+
+        console.log("✅ Conversation created successfully! ID:", data.id);
 
         // Return the new conversation ID so frontend can track it
         return res.status(200).json({
@@ -172,7 +179,9 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
         });
       }
     } catch (dbError) {
-      console.error("Database error:", dbError);
+      console.error("💥 Database error:", dbError);
+      console.error("💥 Error type:", typeof dbError);
+      console.error("💥 Error details:", JSON.stringify(dbError, null, 2));
       return res.status(500).json({
         error: "Failed to save conversation to database",
         details: dbError instanceof Error ? dbError.message : "Unknown error",
