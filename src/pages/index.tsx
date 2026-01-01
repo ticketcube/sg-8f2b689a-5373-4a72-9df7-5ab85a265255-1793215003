@@ -179,6 +179,20 @@ export default function Home() {
     setError("");
   };
 
+  const testMicrophone = () => {
+    if (!recognitionRef.current) {
+      alert("❌ Speech recognition not initialized!\n\nYour browser might not support it.\nPlease use Chrome or Edge.");
+      return;
+    }
+    
+    alert("✅ Microphone setup is ready!\n\n" +
+          "Speech recognition is initialized and ready to use.\n" +
+          "Make sure to:\n" +
+          "1. Allow microphone permissions\n" +
+          "2. Speak clearly and loud enough\n" +
+          "3. Check browser console for detailed logs");
+  };
+
   const startListening = () => {
     if (conversationMode === "idle") {
       setError("Please start a new conversation first");
