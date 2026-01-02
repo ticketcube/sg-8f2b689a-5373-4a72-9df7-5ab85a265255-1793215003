@@ -9,12 +9,24 @@ export default function OAuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      const { code, state, error: oauthError } = router.query;
+
+      if (oauthError) {
+        setError(oauthError as string);
+        setTimeout(() => router.push("/login"), 3000);
+        return;
+      }
+
+      if (!code || !state || typeof code !== "string" || typeof state !== "string") {
+        return;
+      }
+
       try {
-        await fandragonAuthService.handleCallback();
+        await fandragonAuthService.handleCallback(code, state);
         router.push("/");
       } catch (err) {
-        console.error("Callback error:", err);
-        setError("Authentication failed");
+        console.error("OAuth callback error:", err);
+        setError(err instanceof Error ? err.message : "Authentication failed");
         setTimeout(() => router.push("/login"), 3000);
       }
     };
@@ -26,20 +38,20 @@ export default function OAuthCallback() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-destructive mb-2 text-lg font-semibold">Authentication Error</p>
+          <p className="text-destructive mb-2">Authentication Error</p>
           <p className="text-sm text-muted-foreground">{error}</p>
-          <p className="text-xs text-muted-foreground mt-2">Redirecting to login...</p>
+          <p className="text-xs text-muted-foreground mt-2">Redirecting...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
+        <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
         <p className="text-muted-foreground">Completing sign in...</p>
       </div>
     </div>
