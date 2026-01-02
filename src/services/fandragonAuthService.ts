@@ -41,33 +41,29 @@ export const fandragonAuthService = {
   /**
    * Initiate OAuth flow - Call when user clicks "Sign in with FanDragon"
    */
-  initiateLogin: async () => {
-    // Generate state for CSRF protection
-    const state = uuidv4();
-    sessionStorage.setItem("oauth_state", state);
+  initiateLogin: () => {
+    const state = generateRandomString(32);
+    const codeVerifier = generateRandomString(64);
+    const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    // Generate code_verifier for PKCE
-    const codeVerifier = generateCodeVerifier();
+    // Store PKCE values in sessionStorage
+    sessionStorage.setItem("oauth_state", state);
     sessionStorage.setItem("code_verifier", codeVerifier);
 
-    // Generate code_challenge
-    const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-    // Construct authorization URL with correct OAuth 2.1 parameters
+    // Build authorization URL - redirect to our custom consent page
     const params = new URLSearchParams({
       client_id: FANDRAGON_CONFIG.clientId,
       redirect_uri: FANDRAGON_CONFIG.redirectUri,
       response_type: "code",
-      scope: FANDRAGON_CONFIG.scopes.join(" "),
       state: state,
+      scope: FANDRAGON_CONFIG.scopes.join(" "),
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
     });
 
-    // Redirect to FanDragon authorization endpoint
-    const authUrl = `${FANDRAGON_CONFIG.authorizationEndpoint}?${params.toString()}`;
-    console.log("Redirecting to:", authUrl);
-    window.location.href = authUrl;
+    // Redirect to our custom consent page which will handle FanDragon OAuth
+    const consentUrl = `${window.location.origin}/auth/fandragon-consent?${params.toString()}`;
+    window.location.href = consentUrl;
   },
 
   /**
