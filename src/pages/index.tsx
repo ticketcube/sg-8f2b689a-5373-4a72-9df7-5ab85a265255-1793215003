@@ -213,7 +213,7 @@ export default function Home() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setSavedConversations(data || []);
+      setConversations(data || []);
     } catch (error) {
       console.error("Error loading conversations:", error);
     }
@@ -655,7 +655,7 @@ export default function Home() {
   };
 
   const saveConversation = async () => {
-    if (messages.length === 0) return;
+    if (!activeConversation || activeConversation.messages.length === 0) return;
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -665,8 +665,8 @@ export default function Home() {
       }
 
       const conversationData = {
-        title: messages[0]?.content.substring(0, 100) || "New Conversation",
-        messages: messages,
+        title: activeConversation.messages[0]?.content.substring(0, 100) || "New Conversation",
+        messages: activeConversation.messages,
         user_id: session.user.id,
       };
 
