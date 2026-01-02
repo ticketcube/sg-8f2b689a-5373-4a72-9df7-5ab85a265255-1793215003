@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import cookie from "cookie";
 
+const FANDRAGON_CONFIG = {
+  userinfoEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -19,7 +23,7 @@ export default async function handler(
 
     // Fetch user info from FanDragon
     const userResponse = await fetch(
-      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
+      FANDRAGON_CONFIG.userinfoEndpoint,
       {
         headers: { Authorization: `Bearer ${token}` },
       }

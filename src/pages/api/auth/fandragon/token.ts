@@ -1,6 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import cookie from "cookie";
 
+const FANDRAGON_CONFIG = {
+  clientId: "782f7b71-412a-475a-8ab4-602b5ec9af7c",
+  tokenEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/token",
+  userinfoEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -18,7 +24,7 @@ export default async function handler(
   try {
     // Exchange authorization code for tokens
     const tokenResponse = await fetch(
-      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/token",
+      FANDRAGON_CONFIG.tokenEndpoint,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,7 +48,7 @@ export default async function handler(
 
     // Fetch user info
     const userResponse = await fetch(
-      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
+      FANDRAGON_CONFIG.userinfoEndpoint,
       {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
       }
