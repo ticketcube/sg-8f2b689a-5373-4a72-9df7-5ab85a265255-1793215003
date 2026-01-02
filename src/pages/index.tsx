@@ -88,9 +88,8 @@ export default function Home() {
             const transcript = result[0].transcript;
             console.log("✅ Final transcript:", transcript);
             
-            if (recognitionRef.current) {
-              recognitionRef.current.stop();
-            }
+            // DON'T stop recognition - keep listening for continuous conversation
+            // recognitionRef.current.stop(); // ❌ REMOVED - this was stopping after each message
             
             setCurrentQuestion(transcript);
             console.log("📞 Calling handleConversationMessage with activeConversation:", activeConversation);
@@ -286,13 +285,13 @@ export default function Home() {
     }
 
     setError("");
-    console.log("Starting voice recognition...");
+    console.log("🎤 Starting continuous voice recognition...");
     
     if (recognitionRef.current) {
       try {
         recognitionRef.current.start();
         setIsListening(true);
-        console.log("Voice recognition started successfully");
+        console.log("✅ Continuous voice recognition started - will stay active");
       } catch (error) {
         console.error("Error starting recognition:", error);
         setError("Could not start listening. Please try again.");
@@ -300,6 +299,15 @@ export default function Home() {
     } else {
       console.error("Speech recognition not initialized");
       setError("Speech recognition is not available in your browser");
+    }
+  };
+
+  const stopListening = () => {
+    console.log("🛑 Stopping voice recognition...");
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      console.log("✅ Voice recognition stopped");
     }
   };
 
@@ -912,8 +920,8 @@ export default function Home() {
 
               <div className="flex flex-col items-center gap-8 mb-12">
                 <button
-                  onClick={startListening}
-                  disabled={isListening || isProcessing || isSpeaking || conversationMode === "idle"}
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={isProcessing || conversationMode === "idle"}
                   className={`
                     w-64 h-64 rounded-full text-white text-4xl font-bold
                     shadow-2xl transform transition-all duration-300
@@ -922,7 +930,7 @@ export default function Home() {
                       : isProcessing 
                       ? "bg-yellow-500 scale-105" 
                       : isSpeaking
-                      ? "bg-green-500 scale-105 animate-pulse"
+                      ? "bg-green-500 scale-105"
                       : conversationMode === "idle"
                       ? "bg-gray-400 cursor-not-allowed"
                       : "bg-purple-600 hover:bg-purple-700 hover:scale-105"
@@ -935,16 +943,19 @@ export default function Home() {
                     <div className="flex flex-col items-center gap-2">
                       <Mic className="w-16 h-16 animate-pulse" />
                       <span className="text-2xl">Listening...</span>
+                      <span className="text-base">(Click to Stop)</span>
                     </div>
                   ) : isProcessing ? (
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="w-16 h-16 animate-spin" />
                       <span className="text-2xl">Thinking...</span>
+                      {isListening && <span className="text-base">(Still listening)</span>}
                     </div>
                   ) : isSpeaking ? (
                     <div className="flex flex-col items-center gap-2">
                       <Volume2 className="w-16 h-16 animate-pulse" />
                       <span className="text-2xl">Speaking...</span>
+                      {isListening && <span className="text-base">(Still listening)</span>}
                     </div>
                   ) : conversationMode === "idle" ? (
                     <div className="flex flex-col items-center gap-2">
@@ -952,19 +963,22 @@ export default function Home() {
                       <span className="text-2xl">Conversation</span>
                     </div>
                   ) : (
-                    "HELP"
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="text-3xl">START</span>
+                      <span className="text-3xl">TALKING</span>
+                    </div>
                   )}
                 </button>
 
-                {conversationMode === "active" && activeConversation && activeConversation.messages.length > 0 && (
+                {conversationMode === "active" && activeConversation && activeConversation.messages.length > 0 && !isListening && (
                   <div className="flex gap-4">
                     <Button
                       size="lg"
                       onClick={startListening}
-                      disabled={isListening || isProcessing || isSpeaking}
+                      disabled={isProcessing || isSpeaking}
                       className="text-xl px-8 py-6"
                     >
-                      Continue
+                      Continue Talking
                     </Button>
                     <Button
                       size="lg"
@@ -974,6 +988,17 @@ export default function Home() {
                     >
                       End & Save
                     </Button>
+                  </div>
+                )}
+
+                {isListening && (
+                  <div className="text-center">
+                    <p className="text-xl font-semibold text-purple-600 dark:text-purple-400 mb-2">
+                      🎤 Microphone Active - Speak anytime
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      I'll listen while thinking and speaking
+                    </p>
                   </div>
                 )}
 
