@@ -1,11 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import OpenAI from "openai";
-import { supabase } from "@/lib/supabase";
-import cookie from "cookie";
+import { createClient } from "@supabase/supabase-js";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 interface ConversationMessage {
   role: "system" | "user" | "assistant";
@@ -20,39 +24,22 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Verify FanDragon authentication
-  const cookies = cookie.parse(req.headers.cookie || "");
-  const token = cookies.fandragon_token;
-
-  if (!token) {
+  // Get Supabase token from Authorization header
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Not authenticated" });
   }
 
-  // Verify token with FanDragon and get user info
-  let userId: string;
-  try {
-    const userResponse = await fetch(
-      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/userinfo",
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+  const token = authHeader.split(" ")[1];
 
-    if (!userResponse.ok) {
-      return res.status(401).json({ error: "Invalid token" });
-    }
+  // Verify token and get user
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
-    const user = await userResponse.json();
-    userId = user.sub;
-  } catch (error) {
-    return res.status(401).json({ error: "Authentication failed" });
+  if (authError || !user) {
+    return res.status(401).json({ error: "Invalid token" });
   }
 
-  const { userMessage, conversationHistory, conversationId } = req.body;
-
-  if (!userMessage) {
-    return res.status(400).json({ error: "User message is required" });
-  }
+  const userId = user.id;
 
   try {
     const { message, conversationMessages = [], mode = "conversation", conversationId: incomingConversationId } = req.body;
@@ -168,7 +155,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     try {
       if (incomingConversationId) {
         // Update existing conversation
-        await supabase
+        const { error: updateError } = await supabase
           .from("conversations")
           .update({
             messages: updatedMessages,
@@ -176,7 +163,9 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
             updated_at: new Date().toISOString(),
           })
           .eq("id", incomingConversationId)
-          .eq("user_id", userId); // Ensure user owns this conversation
+          .eq("user_id", userId);
+
+        if (updateError) throw updateError;
       } else {
         // Create new conversation
         const { data: newConv, error: insertError } = await supabase
@@ -199,8 +188,6 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       }
     } catch (dbError) {
       console.error("💥 Database error:", dbError);
-      console.error("💥 Error type:", typeof dbError);
-      console.error("💥 Error details:", JSON.stringify(dbError, null, 2));
       return res.status(500).json({
         error: "Failed to save conversation to database",
         details: dbError instanceof Error ? dbError.message : "Unknown error",
