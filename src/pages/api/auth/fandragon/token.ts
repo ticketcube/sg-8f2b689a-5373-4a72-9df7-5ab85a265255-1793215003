@@ -37,7 +37,7 @@ export default async function handler(
         body: JSON.stringify({
           grant_type: "authorization_code",
           code,
-          redirect_uri: `${req.headers.origin}/auth/callback`,
+          redirect_uri: "https://aiassist.fandragon.com/auth/callback",
           client_id: FANDRAGON_CONFIG.clientId,
           client_secret: FANDRAGON_CONFIG.clientSecret,
           code_verifier,
