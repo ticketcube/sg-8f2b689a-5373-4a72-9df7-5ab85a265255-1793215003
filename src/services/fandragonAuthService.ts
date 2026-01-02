@@ -1,118 +1,157 @@
-import { createClient } from "@supabase/supabase-js";
+import { v4 as uuidv4 } from "uuid";
 
-// FanDragon's Supabase instance (shared identity provider)
-const fandragonAuth = createClient(
-  "https://agyoehyzvergiiwdbzmz.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFneW9laHl6dmVyZ2lpd2Riem16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzMzEzNjYsImV4cCI6MjA3NDkwNzM2Nn0.GWK4LrmIlU1VG1bVwL1yMaaXHIQzPPKdxuA-KT_oZ0Y"
-);
+const FANDRAGON_CONFIG = {
+  authorizationEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/authorize",
+  tokenEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/token",
+  userinfoEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/userinfo",
+  clientId: "782f7b71-412a-475a-8ab4-602b5ec9af7c",
+  redirectUri: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "",
+  scopes: ["openid", "email", "profile"],
+};
 
-const CLIENT_ID = "782f7b71-412a-475a-8ab4-602b5ec9af7c"; // Replace with your actual client_id
+// PKCE helper functions
+function generateCodeVerifier(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return base64URLEncode(array);
+}
 
-export interface FanDragonUser {
-  id: string;
-  email?: string;
-  user_metadata?: {
-    full_name?: string;
-    avatar_url?: string;
-  };
-  profile?: {
-    userid: string;
-    username?: string;
-    displayname?: string;
-    avatarurl?: string;
-    role?: string;
-  };
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return base64URLEncode(new Uint8Array(hash));
+}
+
+function base64URLEncode(buffer: Uint8Array): string {
+  const base64 = btoa(String.fromCharCode(...buffer));
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 export const fandragonAuthService = {
   /**
-   * Initiate OAuth flow with FanDragon
+   * Initiate OAuth flow - Call when user clicks "Sign in with FanDragon"
    */
   initiateLogin: async () => {
-    const { error } = await fandragonAuth.auth.signInWithOAuth({
-      provider: "oauth" as any,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: "openid email profile",
-        queryParams: {
-          client_id: CLIENT_ID,
-        },
-      },
+    // Generate state for CSRF protection
+    const state = uuidv4();
+    sessionStorage.setItem("oauth_state", state);
+
+    // Generate code_verifier for PKCE
+    const codeVerifier = generateCodeVerifier();
+    sessionStorage.setItem("code_verifier", codeVerifier);
+
+    // Generate code_challenge
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+    // Construct authorization URL
+    const params = new URLSearchParams({
+      client_id: FANDRAGON_CONFIG.clientId,
+      redirect_uri: FANDRAGON_CONFIG.redirectUri,
+      response_type: "code",
+      scope: FANDRAGON_CONFIG.scopes.join(" "),
+      state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
     });
 
-    if (error) {
-      console.error("OAuth initiation error:", error);
-      throw error;
-    }
+    // Redirect to FanDragon authorization
+    window.location.href = `${FANDRAGON_CONFIG.authorizationEndpoint}?${params}`;
   },
 
   /**
-   * Handle OAuth callback
+   * Handle OAuth callback - Call in /auth/callback page
    */
-  handleCallback: async () => {
-    const { data: { session }, error } = await fandragonAuth.auth.getSession();
-
-    if (error || !session) {
-      throw new Error("Failed to get session");
+  handleCallback: async (code: string, state: string) => {
+    // Verify state (CSRF protection)
+    const savedState = sessionStorage.getItem("oauth_state");
+    if (state !== savedState) {
+      throw new Error("Invalid state - possible CSRF attack");
     }
 
-    // Store session in your app
-    sessionStorage.setItem("fandragon_session", JSON.stringify(session));
-
-    return session;
-  },
-
-  /**
-   * Get current user from FanDragon
-   */
-  getCurrentUser: async (): Promise<FanDragonUser | null> => {
-    const { data: { user }, error } = await fandragonAuth.auth.getUser();
-
-    if (error || !user) {
-      return null;
+    // Get code_verifier for PKCE
+    const codeVerifier = sessionStorage.getItem("code_verifier");
+    if (!codeVerifier) {
+      throw new Error("Code verifier not found");
     }
 
-    // Fetch full profile from shared database
-    const { data: profile } = await fandragonAuth
-      .from("user_profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
+    // Clear stored values
+    sessionStorage.removeItem("oauth_state");
+    sessionStorage.removeItem("code_verifier");
 
-    return {
-      ...user,
-      profile: profile || undefined,
-    } as FanDragonUser;
+    // Exchange code for tokens via API route
+    const response = await fetch("/api/auth/fandragon/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        code, 
+        code_verifier: codeVerifier 
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Token exchange failed");
+    }
+
+    const data = await response.json();
+    
+    // Store session data
+    sessionStorage.setItem("fandragon_session", JSON.stringify({
+      access_token: data.tokens.access_token,
+      refresh_token: data.tokens.refresh_token,
+      expires_at: Date.now() + (data.tokens.expires_in * 1000),
+      user: data.user,
+    }));
+
+    return data;
   },
 
   /**
-   * Sign out
+   * Get current user info
    */
-  signOut: async () => {
-    await fandragonAuth.auth.signOut();
-    sessionStorage.clear();
-    window.location.href = "/";
+  getCurrentUser: async () => {
+    const response = await fetch("/api/auth/fandragon/user");
+    if (!response.ok) return null;
+    return response.json();
   },
 
   /**
-   * Check if user is authenticated
-   */
-  isAuthenticated: () => {
-    const session = sessionStorage.getItem("fandragon_session");
-    return !!session;
-  },
-
-  /**
-   * Get stored session
+   * Get current session
    */
   getSession: () => {
     const sessionStr = sessionStorage.getItem("fandragon_session");
     if (!sessionStr) return null;
     
     try {
-      return JSON.parse(sessionStr);
+      const session = JSON.parse(sessionStr);
+      
+      // Check if token is expired
+      if (session.expires_at && Date.now() > session.expires_at) {
+        sessionStorage.removeItem("fandragon_session");
+        return null;
+      }
+      
+      return session;
     } catch {
       return null;
     }
+  },
+
+  /**
+   * Check if user is authenticated
+   */
+  isAuthenticated: () => {
+    const session = fandragonAuthService.getSession();
+    return !!session;
+  },
+
+  /**
+   * Sign out
+   */
+  signOut: async () => {
+    await fetch("/api/auth/signout", { method: "POST" });
+    sessionStorage.removeItem("fandragon_session");
+    window.location.href = "/login";
   },
 };
