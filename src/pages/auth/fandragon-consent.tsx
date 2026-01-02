@@ -52,16 +52,24 @@ export default function FanDragonConsent() {
         setAppName('AI Assist');
       }
 
-      // Check if user has active FanDragon session
-      const response = await fetch('https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/user', {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Try to get existing FanDragon session from sessionStorage
+      const sessionStr = sessionStorage.getItem('fandragon_session');
+      let accessToken = null;
 
-      if (!response.ok) {
-        // User not logged into FanDragon - redirect to login
+      if (sessionStr) {
+        try {
+          const session = JSON.parse(sessionStr);
+          if (session.access_token && session.expires_at > Date.now()) {
+            accessToken = session.access_token;
+          }
+        } catch {
+          // Invalid session, clear it
+          sessionStorage.removeItem('fandragon_session');
+        }
+      }
+
+      if (!accessToken) {
+        // No valid session - redirect to FanDragon login
         const loginUrl = new URL('https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/authorize');
         loginUrl.searchParams.set('client_id', client_id.toString());
         loginUrl.searchParams.set('redirect_uri', window.location.href);
@@ -72,8 +80,28 @@ export default function FanDragonConsent() {
         return;
       }
 
-      const userData = await response.json();
-      setUserSession(userData);
+      // Check if session is valid via API route
+      const response = await fetch('/api/auth/fandragon/check-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: accessToken }),
+      });
+
+      if (!response.ok) {
+        // Session invalid - redirect to FanDragon login
+        sessionStorage.removeItem('fandragon_session');
+        const loginUrl = new URL('https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/authorize');
+        loginUrl.searchParams.set('client_id', client_id.toString());
+        loginUrl.searchParams.set('redirect_uri', window.location.href);
+        loginUrl.searchParams.set('response_type', 'code');
+        loginUrl.searchParams.set('scope', scope?.toString() || 'openid email profile');
+        
+        window.location.href = loginUrl.toString();
+        return;
+      }
+
+      const data = await response.json();
+      setUserSession(data.user);
       setLoading(false);
     } catch (err: any) {
       setError(err.message || 'Failed to verify session');
