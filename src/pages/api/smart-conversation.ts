@@ -38,7 +38,7 @@ export default async function handler(
   const userId = user.id;
 
   try {
-    const { message, conversationMessages = [], mode = "conversation", conversationId } = req.body;
+    const { message, conversationMessages = [], mode = "conversation", conversationId: incomingConversationId } = req.body;
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Message is required" });
@@ -141,40 +141,43 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     ];
 
     // Generate a title from the first user message if this is a new conversation
-    const title = conversationMessages.length === 0 
+    const conversationTitle = conversationMessages.length === 0 
       ? message.slice(0, 50) + (message.length > 50 ? "..." : "")
       : undefined;
 
     // Save or update conversation in database
+    let resultConversationId = incomingConversationId;
+    
     try {
-      if (conversationId) {
+      if (incomingConversationId) {
         // Update existing conversation
         await supabase
           .from("conversations")
           .update({
-            title: conversationTitle,
-            messages: allMessages,
+            messages: updatedMessages,
             type: conversationType,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", conversationId)
+          .eq("id", incomingConversationId)
           .eq("user_id", userId); // Ensure user owns this conversation
       } else {
         // Create new conversation
-        const { data: newConv } = await supabase
+        const { data: newConv, error: insertError } = await supabase
           .from("conversations")
           .insert({
             user_id: userId,
-            title: conversationTitle,
-            messages: allMessages,
+            title: conversationTitle || "New Conversation",
+            messages: updatedMessages,
             type: conversationType,
             status: "active",
           })
           .select()
           .single();
 
+        if (insertError) throw insertError;
+        
         if (newConv) {
-          conversationId = newConv.id;
+          resultConversationId = newConv.id;
         }
       }
     } catch (dbError) {
@@ -191,7 +194,8 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       response: aiResponse,
       conversationType,
       userIsDone,
-      conversationId,
+      conversationId: resultConversationId,
+      title: conversationTitle,
       messages: updatedMessages,
     });
 
