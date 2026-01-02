@@ -28,13 +28,16 @@ export default function Login() {
 
       if (signInError) throw signInError;
 
-      if (data.user) {
-        // Redirect to main app
-        router.push('/');
+      if (data.session) {
+        console.log('Login successful, session created');
+        // Wait a bit for the session to be properly set
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Use window.location for a hard redirect
+        window.location.href = '/';
       }
     } catch (err: any) {
+      console.error('Login error:', err);
       setError(err.message || 'Failed to sign in');
-    } finally {
       setLoading(false);
     }
   };

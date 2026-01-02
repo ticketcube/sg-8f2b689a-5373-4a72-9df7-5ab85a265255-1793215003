@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Mic, Volume2, Loader2, Trash2, ShoppingCart, Package, Mail, X, Copy, ArrowLeft, Edit2, Plus, MessageSquare, LogOut, User } from "lucide-react";
 import { HelpCard } from "@/components/HelpCard";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
-import { fandragonAuthService, type FanDragonUser } from "@/services/fandragonAuthService";
 import type { SavedItem, ShoppingListContent, MovingListContent, EmailDraftContent, Conversation, Message } from "@/types";
 import {
   DropdownMenu,
@@ -29,8 +28,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [viewingItem, setViewingItem] = useState<SavedItem | null>(null);
-  const [currentUser, setCurrentUser] = useState<FanDragonUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   
   // Conversation management
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -42,29 +40,19 @@ export default function Home() {
   const synthRef = useRef<SpeechSynthesis | null>(null);
 
   useEffect(() => {
-    // Check authentication
-    const checkAuth = async () => {
-      try {
-        const user = await fandragonAuthService.getCurrentUser();
-        if (!user) {
-          router.push("/login");
-          return;
-        }
-        setCurrentUser(user);
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        router.push("/login");
-        return;
-      } finally {
-        setAuthLoading(false);
+    // Get current user
+    const getCurrentUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setCurrentUser(session.user);
       }
     };
 
-    checkAuth();
-  }, [router]);
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !authLoading && currentUser) {
+    if (typeof window !== "undefined" && currentUser) {
       synthRef.current = window.speechSynthesis;
       
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -169,11 +157,11 @@ export default function Home() {
         synthRef.current.cancel();
       }
     };
-  }, [authLoading, currentUser]);
+  }, [currentUser]);
 
   const loadSavedItems = async () => {
     try {
-      const session = fandragonAuthService.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch("/api/saved-items", {
         headers: {
           "Authorization": `Bearer ${session?.access_token}`,
@@ -188,7 +176,7 @@ export default function Home() {
 
   const loadConversations = async () => {
     try {
-      const session = fandragonAuthService.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch("/api/conversations", {
         headers: {
           "Authorization": `Bearer ${session?.access_token}`,
@@ -221,7 +209,8 @@ export default function Home() {
 
   const handleSignOut = async () => {
     try {
-      await fandragonAuthService.signOut();
+      await supabase.auth.signOut();
+      router.push('/login');
     } catch (error) {
       console.error("Sign out error:", error);
     }
@@ -230,7 +219,7 @@ export default function Home() {
   const getUserInitials = () => {
     if (!currentUser) return "?";
     
-    const displayName = currentUser.profile?.displayname || currentUser.user_metadata?.full_name || currentUser.email;
+    const displayName = currentUser.user_metadata?.full_name || currentUser.email;
     if (!displayName) return "?";
     
     const names = displayName.split(" ");
@@ -242,7 +231,7 @@ export default function Home() {
 
   const getUserDisplayName = () => {
     if (!currentUser) return "User";
-    return currentUser.profile?.displayname || currentUser.user_metadata?.full_name || currentUser.email || "User";
+    return currentUser.user_metadata?.full_name || currentUser.email || "User";
   };
 
   const startNewConversation = () => {
@@ -363,7 +352,7 @@ export default function Home() {
         userIsDone: false,
       });
 
-      const session = fandragonAuthService.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
         headers: { 
@@ -436,7 +425,7 @@ export default function Home() {
   const saveConversationToDatabase = async (conversation: Conversation) => {
     try {
       const isNewConversation = conversation.id.startsWith("temp-");
-      const session = fandragonAuthService.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (isNewConversation) {
         const response = await fetch("/api/conversations", {
@@ -482,7 +471,7 @@ export default function Home() {
   const deleteConversation = async (id: string) => {
     if (confirm("Are you sure you want to delete this conversation?")) {
       try {
-        const session = fandragonAuthService.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         await fetch(`/api/conversations?id=${id}`, {
           method: "DELETE",
           headers: {
@@ -548,7 +537,7 @@ export default function Home() {
   const deleteSavedItem = async (id: string) => {
     if (confirm("Are you sure you want to delete this item?")) {
       try {
-        const session = fandragonAuthService.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         await fetch(`/api/saved-items?id=${id}`, {
           method: "DELETE",
           headers: {
@@ -684,14 +673,6 @@ export default function Home() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
-        <Loader2 className="h-12 w-12 animate-spin text-purple-600" />
-      </div>
-    );
-  }
-
   if (viewingItem) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
@@ -701,7 +682,7 @@ export default function Home() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={currentUser?.profile?.avatarurl || currentUser?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
+                  <AvatarImage src={currentUser?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
                   <AvatarFallback>{getUserInitials()}</AvatarFallback>
                 </Avatar>
               </Button>
@@ -764,7 +745,7 @@ export default function Home() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={currentUser?.profile?.avatarurl || currentUser?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
+                  <AvatarImage src={currentUser?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
                   <AvatarFallback>{getUserInitials()}</AvatarFallback>
                 </Avatar>
               </Button>

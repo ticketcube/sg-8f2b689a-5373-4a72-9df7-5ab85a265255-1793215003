@@ -13,13 +13,20 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
+    // Check initial session
     checkAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, !!session);
+      
+      if (event === 'SIGNED_OUT' || !session) {
+        setAuthenticated(false);
         router.push('/login');
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setAuthenticated(true);
+        setLoading(false);
       }
-      setAuthenticated(!!session);
     });
 
     return () => {
@@ -29,16 +36,24 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   const checkAuth = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      console.log('Checking auth - Session:', !!session, 'Error:', error);
+      
+      if (error) throw error;
       
       if (!session) {
+        console.log('No session found, redirecting to login');
+        setAuthenticated(false);
         router.push('/login');
         return;
       }
 
+      console.log('Session found, user authenticated');
       setAuthenticated(true);
     } catch (error) {
       console.error('Auth check error:', error);
+      setAuthenticated(false);
       router.push('/login');
     } finally {
       setLoading(false);
