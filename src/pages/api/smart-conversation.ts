@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import OpenAI from "openai";
 import { supabase } from "@/lib/supabase";
-import type { Message } from "@/types";
+import cookie from "cookie";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -20,22 +20,39 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Get user session from Authorization header
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: "Unauthorized - No session token" });
+  // Verify FanDragon authentication
+  const cookies = cookie.parse(req.headers.cookie || "");
+  const token = cookies.fandragon_token;
+
+  if (!token) {
+    return res.status(401).json({ error: "Not authenticated" });
   }
 
-  const token = authHeader.replace("Bearer ", "");
-  
-  // Verify the session token
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  
-  if (authError || !user) {
-    return res.status(401).json({ error: "Unauthorized - Invalid session" });
+  // Verify token with FanDragon and get user info
+  let userId: string;
+  try {
+    const userResponse = await fetch(
+      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/userinfo",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (!userResponse.ok) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const user = await userResponse.json();
+    userId = user.sub;
+  } catch (error) {
+    return res.status(401).json({ error: "Authentication failed" });
   }
 
-  const userId = user.id;
+  const { userMessage, conversationHistory, conversationId } = req.body;
+
+  if (!userMessage) {
+    return res.status(400).json({ error: "User message is required" });
+  }
 
   try {
     const { message, conversationMessages = [], mode = "conversation", conversationId: incomingConversationId } = req.body;

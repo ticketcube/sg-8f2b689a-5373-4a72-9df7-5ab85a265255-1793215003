@@ -1,5 +1,14 @@
 import { v4 as uuidv4 } from "uuid";
 
+export interface FanDragonUser {
+  sub: string;
+  email: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  [key: string]: any;
+}
+
 const FANDRAGON_CONFIG = {
   authorizationEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/authorize",
   tokenEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/token",
