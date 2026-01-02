@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import OpenAI from "openai";
 import { supabase } from "@/lib/supabase";
+import type { Message } from "@/types";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -18,6 +19,23 @@ export default async function handler(
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  // Get user session from Authorization header
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: "Unauthorized - No session token" });
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  
+  // Verify the session token
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  
+  if (authError || !user) {
+    return res.status(401).json({ error: "Unauthorized - Invalid session" });
+  }
+
+  const userId = user.id;
 
   try {
     const { message, conversationMessages = [], mode = "conversation", conversationId } = req.body;
@@ -131,52 +149,33 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     try {
       if (conversationId) {
         // Update existing conversation
-        console.log("🔄 Updating conversation:", conversationId);
-        const { error } = await supabase
+        await supabase
           .from("conversations")
           .update({
-            messages: updatedMessages,
+            title: conversationTitle,
+            messages: allMessages,
+            type: conversationType,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", conversationId);
-
-        if (error) {
-          console.error("❌ Error updating conversation:", error);
-          throw error;
-        }
-        console.log("✅ Conversation updated successfully");
+          .eq("id", conversationId)
+          .eq("user_id", userId); // Ensure user owns this conversation
       } else {
         // Create new conversation
-        console.log("📝 Creating new conversation with title:", title || "New Conversation");
-        console.log("📝 Messages to save:", updatedMessages.length, "messages");
-        const { data, error } = await supabase
+        const { data: newConv } = await supabase
           .from("conversations")
           .insert({
-            title: title || "New Conversation",
-            messages: updatedMessages,
+            user_id: userId,
+            title: conversationTitle,
+            messages: allMessages,
             type: conversationType,
             status: "active",
           })
           .select()
           .single();
 
-        if (error) {
-          console.error("❌ Error creating conversation:", error);
-          console.error("❌ Error details:", JSON.stringify(error, null, 2));
-          throw error;
+        if (newConv) {
+          conversationId = newConv.id;
         }
-
-        console.log("✅ Conversation created successfully! ID:", data.id);
-
-        // Return the new conversation ID so frontend can track it
-        return res.status(200).json({
-          response: aiResponse,
-          conversationType,
-          userIsDone,
-          conversationId: data.id,
-          title: data.title,
-          messages: updatedMessages,
-        });
       }
     } catch (dbError) {
       console.error("💥 Database error:", dbError);

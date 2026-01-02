@@ -1,26 +1,44 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
+import type { Conversation } from "@/types";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Get user session from Authorization header
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: "Unauthorized - No session token" });
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  
+  // Verify the session token
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  
+  if (authError || !user) {
+    return res.status(401).json({ error: "Unauthorized - Invalid session" });
+  }
+
+  const userId = user.id;
+
   if (req.method === "GET") {
     try {
       const { data, error } = await supabase
         .from("conversations")
         .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(50);
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false });
 
       if (error) throw error;
 
-      return res.status(200).json({ conversations: data || [] });
+      const conversations = (data || []).map((conv: any) => ({
+        ...conv,
+        messages: Array.isArray(conv.messages) ? conv.messages : [],
+      }));
+
+      return res.status(200).json({ conversations });
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
       return res.status(500).json({ error: error.message });
@@ -34,9 +52,10 @@ export default async function handler(
       const { data, error } = await supabase
         .from("conversations")
         .insert({
+          user_id: userId,
           title,
           messages,
-          type: type || "general",
+          type,
           status: status || "active",
         })
         .select()
@@ -55,15 +74,16 @@ export default async function handler(
     try {
       const { id, title, messages, status } = req.body;
 
-      const updates: any = { updated_at: new Date().toISOString() };
-      if (title !== undefined) updates.title = title;
-      if (messages !== undefined) updates.messages = messages;
-      if (status !== undefined) updates.status = status;
-
       const { data, error } = await supabase
         .from("conversations")
-        .update(updates)
+        .update({
+          title,
+          messages,
+          status,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", id)
+        .eq("user_id", userId) // Ensure user owns this conversation
         .select()
         .single();
 
@@ -83,7 +103,8 @@ export default async function handler(
       const { error } = await supabase
         .from("conversations")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", userId); // Ensure user owns this conversation
 
       if (error) throw error;
 
