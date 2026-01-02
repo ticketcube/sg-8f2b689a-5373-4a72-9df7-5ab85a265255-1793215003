@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import cookie from "cookie";
 
 const FANDRAGON_CONFIG = {
-    clientId: "782f7b71-412a-475a-8ab4-602b5ec9af7c",
+  clientId: "782f7b71-412a-475a-8ab4-602b5ec9af7c",
+  clientSecret: process.env.CLIENT_SECRET || "",
   tokenEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/token",
   userinfoEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
 };
@@ -21,6 +22,11 @@ export default async function handler(
     return res.status(400).json({ error: "Missing required parameters" });
   }
 
+  if (!FANDRAGON_CONFIG.clientSecret) {
+    console.error("CLIENT_SECRET not configured");
+    return res.status(500).json({ error: "Server configuration error" });
+  }
+
   try {
     // Exchange authorization code for tokens
     const tokenResponse = await fetch(
@@ -33,6 +39,7 @@ export default async function handler(
           code,
           redirect_uri: `${req.headers.origin}/auth/callback`,
           client_id: FANDRAGON_CONFIG.clientId,
+          client_secret: FANDRAGON_CONFIG.clientSecret,
           code_verifier,
         }),
       }
