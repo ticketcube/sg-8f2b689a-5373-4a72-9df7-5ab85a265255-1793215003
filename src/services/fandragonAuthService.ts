@@ -13,7 +13,7 @@ const FANDRAGON_CONFIG = {
   authorizationEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/authorize",
   tokenEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/token",
   userinfoEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
-  clientId: "fdkfcf03c0e92d72ce1caf28db409fe8232bfc0fddcb5095fd2b691a097560057b5",
+    clientId: "fdk_90ec50be00465cdcd769f0511e01c8c7b88df5d832efd0f6c098bead5ce5869c",
   redirectUri: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "",
   scopes: ["openid", "email", "profile"],
 };
