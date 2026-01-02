@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
-
 export interface FanDragonUser {
   sub: string;
   email: string;
@@ -17,6 +15,13 @@ const FANDRAGON_CONFIG = {
   redirectUri: "https://aiassist.fandragon.com/auth/callback",
   scopes: ["openid", "email", "profile"],
 };
+
+// Random string generator
+function generateRandomString(length: number): string {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
 // PKCE helper functions
 function generateCodeVerifier(): string {
@@ -41,10 +46,10 @@ export const fandragonAuthService = {
   /**
    * Initiate OAuth flow - Call when user clicks "Sign in with FanDragon"
    */
-  initiateLogin: () => {
+  initiateLogin: async () => {
     const state = generateRandomString(32);
-    const codeVerifier = generateRandomString(64);
-    const codeChallenge = generateCodeChallenge(codeVerifier);
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
 
     // Store PKCE values in sessionStorage
     sessionStorage.setItem("oauth_state", state);
