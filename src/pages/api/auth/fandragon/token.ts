@@ -18,13 +18,15 @@ export default async function handler(
   try {
     // Exchange authorization code for tokens
     const tokenResponse = await fetch(
-      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/token?grant_type=authorization_code",
+      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/token",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          grant_type: "authorization_code",
           code,
           redirect_uri: `${req.headers.origin}/auth/callback`,
+          client_id: FANDRAGON_CONFIG.clientId,
           code_verifier,
         }),
       }
@@ -40,7 +42,7 @@ export default async function handler(
 
     // Fetch user info
     const userResponse = await fetch(
-      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/userinfo",
+      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
       {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
       }

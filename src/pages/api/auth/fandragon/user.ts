@@ -19,7 +19,7 @@ export default async function handler(
 
     // Fetch user info from FanDragon
     const userResponse = await fetch(
-      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/userinfo",
+      "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
       {
         headers: { Authorization: `Bearer ${token}` },
       }
