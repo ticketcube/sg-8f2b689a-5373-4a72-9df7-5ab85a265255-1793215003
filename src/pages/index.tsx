@@ -44,7 +44,10 @@ export default function Home() {
     const getCurrentUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        console.log("👤 Current user loaded:", session.user.id);
         setCurrentUser(session.user);
+      } else {
+        console.log("⚠️ No user session found");
       }
     };
 
@@ -53,6 +56,7 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== "undefined" && currentUser) {
+      console.log("🎤 Initializing speech recognition for user:", currentUser.id);
       synthRef.current = window.speechSynthesis;
       
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -89,7 +93,8 @@ export default function Home() {
             }
             
             setCurrentQuestion(transcript);
-            handleConversationMessage(transcript);
+            console.log("📞 Calling handleConversationMessage with activeConversation:", activeConversation);
+            handleConversationMessage(transcript, activeConversation);
           } else {
             console.log("⏳ Interim result:", result[0].transcript);
           }
@@ -157,7 +162,7 @@ export default function Home() {
         synthRef.current.cancel();
       }
     };
-  }, [currentUser]);
+  }, [currentUser, activeConversation]);
 
   const loadSavedItems = async () => {
     try {
@@ -245,12 +250,14 @@ export default function Home() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    console.log("✅ New conversation created:", newConv);
     setActiveConversation(newConv);
     setConversationMode("active");
-    console.log("✅ New conversation created and set as active:", newConv);
+    console.log("✅ State updated - conversationMode set to 'active'");
   };
 
   const resumeConversation = (conversation: Conversation) => {
+    console.log("▶️ Resuming conversation:", conversation.id);
     setActiveConversation(conversation);
     setConversationMode("active");
     setCurrentQuestion("");
@@ -296,14 +303,19 @@ export default function Home() {
     }
   };
 
-  const handleConversationMessage = async (message: string) => {
-    console.log("📝 handleConversationMessage called with:", message);
-    console.log("📋 Current activeConversation:", activeConversation);
-    console.log("🎯 Current conversationMode:", conversationMode);
+  const handleConversationMessage = async (message: string, currentConversation: Conversation | null) => {
+    console.log("📝 handleConversationMessage ENTRY");
+    console.log("📝 Message:", message);
+    console.log("📝 Passed conversation:", currentConversation);
+    console.log("📝 State activeConversation:", activeConversation);
+    console.log("📝 conversationMode:", conversationMode);
 
-    if (!activeConversation) {
-      console.log("⚠️ No active conversation found, creating new one...");
-      const newConversation: Conversation = {
+    // Use the passed conversation or create a new one
+    let workingConversation = currentConversation;
+
+    if (!workingConversation) {
+      console.log("⚠️ No conversation passed, creating new one...");
+      workingConversation = {
         id: `temp-${Date.now()}`,
         title: "New Conversation",
         messages: [],
@@ -312,11 +324,9 @@ export default function Home() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      setActiveConversation(newConversation);
+      console.log("✅ Created working conversation:", workingConversation);
+      setActiveConversation(workingConversation);
       setConversationMode("active");
-      console.log("✅ Created new conversation:", newConversation);
-      setTimeout(() => handleConversationMessage(message), 100);
-      return;
     }
 
     if (conversationMode !== "active") {
@@ -324,7 +334,7 @@ export default function Home() {
       setConversationMode("active");
     }
 
-    console.log("🚀 Starting conversation message processing...");
+    console.log("🚀 Starting conversation message processing with conversation:", workingConversation.id);
 
     setIsProcessing(true);
 
@@ -335,24 +345,29 @@ export default function Home() {
         timestamp: new Date(),
       };
 
-      const updatedMessages = [...activeConversation.messages, userMessage];
+      const updatedMessages = [...workingConversation.messages, userMessage];
       console.log("💬 Updated messages array:", updatedMessages);
 
-      setActiveConversation((prev) => ({
-        ...prev!,
+      const updatedConversation = {
+        ...workingConversation,
         messages: updatedMessages,
-      }));
+      };
+
+      console.log("🔄 Setting activeConversation to updated version");
+      setActiveConversation(updatedConversation);
 
       console.log("📡 Preparing API call to /api/smart-conversation");
       console.log("📦 API Request body:", {
         message,
-        conversationId: activeConversation.id !== "temp" ? activeConversation.id : null,
-        existingMessages: activeConversation.messages,
-        conversationType: activeConversation.type,
+        conversationId: workingConversation.id.startsWith("temp-") ? null : workingConversation.id,
+        existingMessages: workingConversation.messages,
+        conversationType: workingConversation.type,
         userIsDone: false,
       });
 
       const { data: { session } } = await supabase.auth.getSession();
+      console.log("🔑 Got session, token exists:", !!session?.access_token);
+
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
         headers: { 
@@ -361,9 +376,9 @@ export default function Home() {
         },
         body: JSON.stringify({
           message,
-          conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
-          existingMessages: activeConversation.messages,
-          conversationType: activeConversation.type,
+          conversationId: workingConversation.id.startsWith("temp-") ? null : workingConversation.id,
+          existingMessages: workingConversation.messages,
+          conversationType: workingConversation.type,
           userIsDone: false,
         }),
       });
@@ -392,17 +407,17 @@ export default function Home() {
       const finalMessages = [...updatedMessages, assistantMessage];
       console.log("📚 Final messages array:", finalMessages);
 
-      const updatedConversation = {
-        ...activeConversation,
-        id: data.conversationId || activeConversation.id,
-        title: data.title || activeConversation.title,
+      const finalConversation = {
+        ...workingConversation,
+        id: data.conversationId || workingConversation.id,
+        title: data.title || workingConversation.title,
         messages: data.messages || finalMessages,
-        type: data.conversationType || activeConversation.type,
+        type: data.conversationType || workingConversation.type,
         updated_at: new Date().toISOString(),
       };
 
-      console.log("🔄 Setting active conversation to:", updatedConversation);
-      setActiveConversation(updatedConversation);
+      console.log("🔄 Setting active conversation to final version:", finalConversation);
+      setActiveConversation(finalConversation);
 
       console.log("🔃 Reloading conversations list...");
       await loadConversations();
@@ -499,15 +514,18 @@ export default function Home() {
       utterance.volume = 1;
 
       utterance.onstart = () => {
+        console.log("🔊 Started speaking");
         setIsSpeaking(true);
         setIsProcessing(false);
       };
       
       utterance.onend = () => {
+        console.log("🔇 Finished speaking");
         setIsSpeaking(false);
       };
       
       utterance.onerror = () => {
+        console.error("❌ Speech synthesis error");
         setIsSpeaking(false);
         setIsProcessing(false);
         setError("Could not speak the answer");
@@ -796,10 +814,19 @@ export default function Home() {
                   variant="outline"
                   onClick={async () => {
                     try {
+                      console.log("🧪 Starting test-save API call...");
+                      const { data: { session } } = await supabase.auth.getSession();
+                      console.log("🔑 Got session for test, token exists:", !!session?.access_token);
+                      
                       const response = await fetch("/api/test-save", {
                         method: "POST",
+                        headers: {
+                          "Authorization": `Bearer ${session?.access_token}`,
+                        },
                       });
                       const data = await response.json();
+                      console.log("🧪 Test response:", data);
+                      
                       if (data.success) {
                         alert(`✅ Database save works! Conversation ID: ${data.conversationId}`);
                         await loadConversations();
@@ -807,6 +834,7 @@ export default function Home() {
                         alert(`❌ Database save failed: ${data.error}`);
                       }
                     } catch (error: any) {
+                      console.error("🧪 Test error:", error);
                       alert(`❌ Test failed: ${error.message}`);
                     }
                   }}
