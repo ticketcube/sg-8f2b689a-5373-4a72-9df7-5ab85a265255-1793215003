@@ -53,7 +53,7 @@ export const fandragonAuthService = {
     // Generate code_challenge
     const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-    // Construct authorization URL
+    // Construct authorization URL with correct OAuth 2.1 parameters
     const params = new URLSearchParams({
       client_id: FANDRAGON_CONFIG.clientId,
       redirect_uri: FANDRAGON_CONFIG.redirectUri,
@@ -64,8 +64,10 @@ export const fandragonAuthService = {
       code_challenge_method: "S256",
     });
 
-    // Redirect to FanDragon authorization
-    window.location.href = `${FANDRAGON_CONFIG.authorizationEndpoint}?${params}`;
+    // Redirect to FanDragon authorization endpoint
+    const authUrl = `${FANDRAGON_CONFIG.authorizationEndpoint}?${params.toString()}`;
+    console.log("Redirecting to:", authUrl);
+    window.location.href = authUrl;
   },
 
   /**
