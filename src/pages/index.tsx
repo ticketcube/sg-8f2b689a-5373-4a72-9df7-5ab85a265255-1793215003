@@ -171,7 +171,12 @@ export default function Home() {
 
   const loadSavedItems = async () => {
     try {
-      const response = await fetch("/api/saved-items");
+      const session = fandragonAuthService.getSession();
+      const response = await fetch("/api/saved-items", {
+        headers: {
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
+      });
       const data = await response.json();
       setSavedItems(data.items || []);
     } catch (error) {
@@ -181,7 +186,12 @@ export default function Home() {
 
   const loadConversations = async () => {
     try {
-      const response = await fetch("/api/conversations");
+      const session = fandragonAuthService.getSession();
+      const response = await fetch("/api/conversations", {
+        headers: {
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
+      });
       const data = await response.json();
       setConversations(data.conversations || []);
     } catch (error) {
@@ -333,9 +343,13 @@ export default function Home() {
         userIsDone: false,
       });
 
+      const session = fandragonAuthService.getSession();
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
         body: JSON.stringify({
           message,
           conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
@@ -402,12 +416,14 @@ export default function Home() {
   const saveConversationToDatabase = async (conversation: Conversation) => {
     try {
       const isNewConversation = conversation.id.startsWith("temp-");
+      const session = fandragonAuthService.getSession();
       
       if (isNewConversation) {
         const response = await fetch("/api/conversations", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
             title: conversation.title,
@@ -424,6 +440,7 @@ export default function Home() {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
             id: conversation.id,
@@ -445,8 +462,12 @@ export default function Home() {
   const deleteConversation = async (id: string) => {
     if (confirm("Are you sure you want to delete this conversation?")) {
       try {
+        const session = fandragonAuthService.getSession();
         await fetch(`/api/conversations?id=${id}`, {
           method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${session?.access_token}`,
+          },
         });
         await loadConversations();
         if (activeConversation?.id === id) {
@@ -507,8 +528,12 @@ export default function Home() {
   const deleteSavedItem = async (id: string) => {
     if (confirm("Are you sure you want to delete this item?")) {
       try {
+        const session = fandragonAuthService.getSession();
         await fetch(`/api/saved-items?id=${id}`, {
           method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${session?.access_token}`,
+          },
         });
         setSavedItems(savedItems.filter(item => item.id !== id));
         if (viewingItem?.id === id) {
