@@ -16,6 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const router = useRouter();
@@ -194,6 +196,24 @@ export default function Home() {
       });
       const data = await response.json();
       setConversations(data.conversations || []);
+    } catch (error) {
+      console.error("Error loading conversations:", error);
+    }
+  };
+
+  const loadSavedConversations = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setSavedConversations(data || []);
     } catch (error) {
       console.error("Error loading conversations:", error);
     }
@@ -634,6 +654,36 @@ export default function Home() {
     return null;
   };
 
+  const saveConversation = async () => {
+    if (messages.length === 0) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        alert("You must be logged in to save conversations");
+        return;
+      }
+
+      const conversationData = {
+        title: messages[0]?.content.substring(0, 100) || "New Conversation",
+        messages: messages,
+        user_id: session.user.id,
+      };
+
+      const { error } = await supabase
+        .from("conversations")
+        .insert([conversationData]);
+
+      if (error) throw error;
+
+      alert("Conversation saved!");
+      loadSavedConversations();
+    } catch (error) {
+      console.error("Error saving conversation:", error);
+      alert("Failed to save conversation");
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
@@ -706,294 +756,296 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
-      <div className="absolute top-4 right-4 flex items-center gap-2">
-        <ThemeSwitch />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={currentUser?.profile?.avatarurl || currentUser?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
-                <AvatarFallback>{getUserInitials()}</AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{getUserDisplayName()}</p>
-                <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="flex h-screen">
-        {/* Sidebar */}
-        {showSidebar && (
-          <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Conversations</h2>
-              
-              <Button
-                size="lg"
-                onClick={startNewConversation}
-                className="w-full mb-6 text-lg"
-              >
-                <Plus className="mr-2 h-5 w-5" />
-                New Conversation
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <ThemeSwitch />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={currentUser?.profile?.avatarurl || currentUser?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                </Avatar>
               </Button>
-
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={testMicrophone}
-                className="w-full mb-4 text-sm"
-              >
-                🎤 Test Microphone Setup
-              </Button>
-
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    const response = await fetch("/api/test-save", {
-                      method: "POST",
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      alert(`✅ Database save works! Conversation ID: ${data.conversationId}`);
-                      await loadConversations();
-                    } else {
-                      alert(`❌ Database save failed: ${data.error}`);
-                    }
-                  } catch (error: any) {
-                    alert(`❌ Test failed: ${error.message}`);
-                  }
-                }}
-                className="w-full mb-4 text-sm"
-              >
-                💾 Test Database Save
-              </Button>
-
-              <div className="space-y-2">
-                {conversations.map((conv) => {
-                  const messageCount = Array.isArray(conv.messages)
-                    ? conv.messages.length
-                    : 0;
-
-                  return (
-                    <Card
-                      key={conv.id}
-                      className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${
-                        activeConversation?.id === conv.id ? "ring-2 ring-purple-500" : ""
-                      }`}
-                      onClick={() => resumeConversation(conv)}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          {getItemIcon(conv.type)}
-                          <h3 className="text-lg font-semibold line-clamp-1">{conv.title}</h3>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteConversation(conv.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        {messageCount} messages{" "}
-                        {conv.updated_at
-                          ? `• ${new Date(conv.updated_at).toLocaleDateString()}`
-                          : ""}
-                      </p>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="container mx-auto px-4 py-8 max-w-4xl">
-            <div className="text-center mb-8">
-              <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-2">
-                Lois's Assistant
-              </h1>
-              {activeConversation && conversationMode !== "idle" && (
-                <div className="flex items-center justify-center gap-2 mt-4">
-                  <p className="text-xl text-gray-600 dark:text-gray-300">
-                    Current: <span className="font-semibold text-purple-600 dark:text-purple-400">{activeConversation.title}</span>
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={startEditingTitle}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                  <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
                 </div>
-              )}
-            </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-            <div className="flex flex-col items-center gap-8 mb-12">
-              <button
-                onClick={startListening}
-                disabled={isListening || isProcessing || isSpeaking || conversationMode === "idle"}
-                className={`
-                  w-64 h-64 rounded-full text-white text-4xl font-bold
-                  shadow-2xl transform transition-all duration-300
-                  ${isListening 
-                    ? "bg-red-500 scale-110 animate-pulse" 
-                    : isProcessing 
-                    ? "bg-yellow-500 scale-105" 
-                    : isSpeaking
-                    ? "bg-green-500 scale-105 animate-pulse"
-                    : conversationMode === "idle"
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-purple-600 hover:bg-purple-700 hover:scale-105"
-                  }
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  focus:outline-none focus:ring-4 focus:ring-purple-300
-                `}
-              >
-                {isListening ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Mic className="w-16 h-16 animate-pulse" />
-                    <span className="text-2xl">Listening...</span>
-                  </div>
-                ) : isProcessing ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="w-16 h-16 animate-spin" />
-                    <span className="text-2xl">Thinking...</span>
-                  </div>
-                ) : isSpeaking ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Volume2 className="w-16 h-16 animate-pulse" />
-                    <span className="text-2xl">Speaking...</span>
-                  </div>
-                ) : conversationMode === "idle" ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-2xl">Start New</span>
-                    <span className="text-2xl">Conversation</span>
-                  </div>
-                ) : (
-                  "HELP"
-                )}
-              </button>
+        <div className="flex h-screen">
+          {/* Sidebar */}
+          {showSidebar && (
+            <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Conversations</h2>
+                
+                <Button
+                  size="lg"
+                  onClick={startNewConversation}
+                  className="w-full mb-6 text-lg"
+                >
+                  <Plus className="mr-2 h-5 w-5" />
+                  New Conversation
+                </Button>
 
-              {conversationMode === "active" && activeConversation && activeConversation.messages.length > 0 && (
-                <div className="flex gap-4">
-                  <Button
-                    size="lg"
-                    onClick={startListening}
-                    disabled={isListening || isProcessing || isSpeaking}
-                    className="text-xl px-8 py-6"
-                  >
-                    Continue
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={endAndSaveConversation}
-                    className="text-xl px-8 py-6"
-                  >
-                    End & Save
-                  </Button>
-                </div>
-              )}
-
-              {isSpeaking && (
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={stopSpeaking}
-                  className="text-xl px-8 py-6"
+                  onClick={testMicrophone}
+                  className="w-full mb-4 text-sm"
                 >
-                  Stop Speaking
+                  🎤 Test Microphone Setup
                 </Button>
-              )}
 
-              {error && (
-                <Card className="p-6 bg-red-50 dark:bg-red-900/20 border-red-200 w-full max-w-2xl">
-                  <p className="text-red-600 dark:text-red-400 text-lg font-semibold text-center">
-                    {error}
-                  </p>
-                </Card>
-              )}
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch("/api/test-save", {
+                        method: "POST",
+                      });
+                      const data = await response.json();
+                      if (data.success) {
+                        alert(`✅ Database save works! Conversation ID: ${data.conversationId}`);
+                        await loadConversations();
+                      } else {
+                        alert(`❌ Database save failed: ${data.error}`);
+                      }
+                    } catch (error: any) {
+                      alert(`❌ Test failed: ${error.message}`);
+                    }
+                  }}
+                  className="w-full mb-4 text-sm"
+                >
+                  💾 Test Database Save
+                </Button>
 
-              {activeConversation &&
-                Array.isArray(activeConversation.messages) &&
-                activeConversation.messages.length > 0 && (
-                  <Card className="p-6 w-full max-w-2xl">
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {activeConversation.messages.map((msg, index) => (
-                        <div key={index} className={msg.role === "user" ? "text-right" : "text-left"}>
-                          <div
-                            className={`inline-block p-4 rounded-lg ${
-                              msg.role === "user"
-                                ? "bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100"
-                                : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                            }`}
-                          >
-                            <p className="text-lg">{msg.content}</p>
+                <div className="space-y-2">
+                  {conversations.map((conv) => {
+                    const messageCount = Array.isArray(conv.messages)
+                      ? conv.messages.length
+                      : 0;
+
+                    return (
+                      <Card
+                        key={conv.id}
+                        className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${
+                          activeConversation?.id === conv.id ? "ring-2 ring-purple-500" : ""
+                        }`}
+                        onClick={() => resumeConversation(conv)}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            {getItemIcon(conv.type)}
+                            <h3 className="text-lg font-semibold line-clamp-1">{conv.title}</h3>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteConversation(conv.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-            </div>
-
-            {savedItems.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-                  Saved Items
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {savedItems.map((item) => (
-                    <Card
-                      key={item.id}
-                      className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-                      onClick={() => setViewingItem(item)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {getItemIcon(item.type)}
-                          <h3 className="text-xl font-semibold">{item.title}</h3>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        {new Date(item.created_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric"
-                        })}
-                      </p>
-                    </Card>
-                  ))}
+                        <p className="text-sm text-gray-500">
+                          {messageCount} messages{" "}
+                          {conv.updated_at
+                            ? `• ${new Date(conv.updated_at).toLocaleDateString()}`
+                            : ""}
+                        </p>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            <HelpCard />
+          {/* Main Content */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="container mx-auto px-4 py-8 max-w-4xl">
+              <div className="text-center mb-8">
+                <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-2">
+                  Lois's Assistant
+                </h1>
+                {activeConversation && conversationMode !== "idle" && (
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <p className="text-xl text-gray-600 dark:text-gray-300">
+                      Current: <span className="font-semibold text-purple-600 dark:text-purple-400">{activeConversation.title}</span>
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={startEditingTitle}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col items-center gap-8 mb-12">
+                <button
+                  onClick={startListening}
+                  disabled={isListening || isProcessing || isSpeaking || conversationMode === "idle"}
+                  className={`
+                    w-64 h-64 rounded-full text-white text-4xl font-bold
+                    shadow-2xl transform transition-all duration-300
+                    ${isListening 
+                      ? "bg-red-500 scale-110 animate-pulse" 
+                      : isProcessing 
+                      ? "bg-yellow-500 scale-105" 
+                      : isSpeaking
+                      ? "bg-green-500 scale-105 animate-pulse"
+                      : conversationMode === "idle"
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-purple-600 hover:bg-purple-700 hover:scale-105"
+                    }
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    focus:outline-none focus:ring-4 focus:ring-purple-300
+                  `}
+                >
+                  {isListening ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Mic className="w-16 h-16 animate-pulse" />
+                      <span className="text-2xl">Listening...</span>
+                    </div>
+                  ) : isProcessing ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-16 h-16 animate-spin" />
+                      <span className="text-2xl">Thinking...</span>
+                    </div>
+                  ) : isSpeaking ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Volume2 className="w-16 h-16 animate-pulse" />
+                      <span className="text-2xl">Speaking...</span>
+                    </div>
+                  ) : conversationMode === "idle" ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="text-2xl">Start New</span>
+                      <span className="text-2xl">Conversation</span>
+                    </div>
+                  ) : (
+                    "HELP"
+                  )}
+                </button>
+
+                {conversationMode === "active" && activeConversation && activeConversation.messages.length > 0 && (
+                  <div className="flex gap-4">
+                    <Button
+                      size="lg"
+                      onClick={startListening}
+                      disabled={isListening || isProcessing || isSpeaking}
+                      className="text-xl px-8 py-6"
+                    >
+                      Continue
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={endAndSaveConversation}
+                      className="text-xl px-8 py-6"
+                    >
+                      End & Save
+                    </Button>
+                  </div>
+                )}
+
+                {isSpeaking && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={stopSpeaking}
+                    className="text-xl px-8 py-6"
+                  >
+                    Stop Speaking
+                  </Button>
+                )}
+
+                {error && (
+                  <Card className="p-6 bg-red-50 dark:bg-red-900/20 border-red-200 w-full max-w-2xl">
+                    <p className="text-red-600 dark:text-red-400 text-lg font-semibold text-center">
+                      {error}
+                    </p>
+                  </Card>
+                )}
+
+                {activeConversation &&
+                  Array.isArray(activeConversation.messages) &&
+                  activeConversation.messages.length > 0 && (
+                    <Card className="p-6 w-full max-w-2xl">
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {activeConversation.messages.map((msg, index) => (
+                          <div key={index} className={msg.role === "user" ? "text-right" : "text-left"}>
+                            <div
+                              className={`inline-block p-4 rounded-lg ${
+                                msg.role === "user"
+                                  ? "bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100"
+                                  : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                              }`}
+                            >
+                              <p className="text-lg">{msg.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  )}
+              </div>
+
+              {savedItems.length > 0 && (
+                <div className="mb-8">
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                    Saved Items
+                  </h2>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {savedItems.map((item) => (
+                      <Card
+                        key={item.id}
+                        className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
+                        onClick={() => setViewingItem(item)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {getItemIcon(item.type)}
+                            <h3 className="text-xl font-semibold">{item.title}</h3>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {new Date(item.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric"
+                          })}
+                        </p>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <HelpCard />
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }
