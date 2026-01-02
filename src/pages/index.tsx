@@ -88,9 +88,6 @@ export default function Home() {
             const transcript = result[0].transcript;
             console.log("✅ Final transcript:", transcript);
             
-            // DON'T stop recognition - keep listening for continuous conversation
-            // recognitionRef.current.stop(); // ❌ REMOVED - this was stopping after each message
-            
             setCurrentQuestion(transcript);
             console.log("📞 Calling handleConversationMessage with activeConversation:", activeConversation);
             handleConversationMessage(transcript, activeConversation);
@@ -161,7 +158,7 @@ export default function Home() {
         synthRef.current.cancel();
       }
     };
-  }, [currentUser, activeConversation]);
+  }, [currentUser]);
 
   const loadSavedItems = async () => {
     try {
