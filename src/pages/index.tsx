@@ -1,12 +1,24 @@
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mic, Volume2, Loader2, Trash2, ShoppingCart, Package, Mail, X, Copy, ArrowLeft, Edit2, Plus, MessageSquare } from "lucide-react";
+import { Mic, Volume2, Loader2, Trash2, ShoppingCart, Package, Mail, X, Copy, ArrowLeft, Edit2, Plus, MessageSquare, LogOut, User } from "lucide-react";
 import { HelpCard } from "@/components/HelpCard";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { fandragonAuthService, type FanDragonUser } from "@/services/fandragonAuthService";
 import type { SavedItem, ShoppingListContent, MovingListContent, EmailDraftContent, Conversation, Message } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Home() {
+  const router = useRouter();
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -15,6 +27,8 @@ export default function Home() {
   const [error, setError] = useState("");
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [viewingItem, setViewingItem] = useState<SavedItem | null>(null);
+  const [currentUser, setCurrentUser] = useState<FanDragonUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   
   // Conversation management
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -26,14 +40,36 @@ export default function Home() {
   const synthRef = useRef<SpeechSynthesis | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    // Check authentication
+    const checkAuth = async () => {
+      try {
+        const user = await fandragonAuthService.getCurrentUser();
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+        setCurrentUser(user);
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        router.push("/login");
+        return;
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && !authLoading && currentUser) {
       synthRef.current = window.speechSynthesis;
       
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;  // Keep listening
-        recognitionRef.current.interimResults = true;  // Show partial results
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
         recognitionRef.current.lang = "en-US";
         recognitionRef.current.maxAlternatives = 1;
 
@@ -45,7 +81,6 @@ export default function Home() {
         recognitionRef.current.onresult = (event: any) => {
           console.log("🎤 Speech detected! Event:", event);
           
-          // Get the most recent result
           const resultIndex = event.resultIndex;
           const result = event.results[resultIndex];
           
@@ -55,12 +90,10 @@ export default function Home() {
             transcript: result[0].transcript
           });
 
-          // Only process final results
           if (result.isFinal) {
             const transcript = result[0].transcript;
             console.log("✅ Final transcript:", transcript);
             
-            // Stop listening after getting final result
             if (recognitionRef.current) {
               recognitionRef.current.stop();
             }
@@ -79,16 +112,16 @@ export default function Home() {
           let errorMessage = "Sorry, I couldn't hear you clearly. ";
           
           switch(event.error) {
-            case 'no-speech':
+            case "no-speech":
               errorMessage += "No speech detected. Please try again and speak clearly.";
               break;
-            case 'audio-capture':
+            case "audio-capture":
               errorMessage += "Microphone not accessible. Check permissions.";
               break;
-            case 'not-allowed':
+            case "not-allowed":
               errorMessage += "Microphone permission denied. Please allow access.";
               break;
-            case 'network':
+            case "network":
               errorMessage += "Network error. Check your connection.";
               break;
             default:
@@ -124,15 +157,17 @@ export default function Home() {
       }
     }
 
-    loadSavedItems();
-    loadConversations();
+    if (currentUser) {
+      loadSavedItems();
+      loadConversations();
+    }
 
     return () => {
       if (synthRef.current) {
         synthRef.current.cancel();
       }
     };
-  }, []);
+  }, [authLoading, currentUser]);
 
   const loadSavedItems = async () => {
     try {
@@ -152,6 +187,32 @@ export default function Home() {
     } catch (error) {
       console.error("Error loading conversations:", error);
     }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await fandragonAuthService.signOut();
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
+  };
+
+  const getUserInitials = () => {
+    if (!currentUser) return "?";
+    
+    const displayName = currentUser.profile?.displayname || currentUser.user_metadata?.full_name || currentUser.email;
+    if (!displayName) return "?";
+    
+    const names = displayName.split(" ");
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return displayName.substring(0, 2).toUpperCase();
+  };
+
+  const getUserDisplayName = () => {
+    if (!currentUser) return "User";
+    return currentUser.profile?.displayname || currentUser.user_metadata?.full_name || currentUser.email || "User";
   };
 
   const startNewConversation = () => {
@@ -221,7 +282,6 @@ export default function Home() {
     console.log("📋 Current activeConversation:", activeConversation);
     console.log("🎯 Current conversationMode:", conversationMode);
 
-    // Validate conversation state - if no active conversation, create one
     if (!activeConversation) {
       console.log("⚠️ No active conversation found, creating new one...");
       const newConversation: Conversation = {
@@ -236,7 +296,6 @@ export default function Home() {
       setActiveConversation(newConversation);
       setConversationMode("active");
       console.log("✅ Created new conversation:", newConversation);
-      // Re-run this function with the new conversation
       setTimeout(() => handleConversationMessage(message), 100);
       return;
     }
@@ -251,7 +310,6 @@ export default function Home() {
     setIsProcessing(true);
 
     try {
-      // Add user message to conversation
       const userMessage: Message = {
         role: "user",
         content: message,
@@ -262,7 +320,7 @@ export default function Home() {
       console.log("💬 Updated messages array:", updatedMessages);
 
       setActiveConversation((prev) => ({
-        ...prev,
+        ...prev!,
         messages: updatedMessages,
       }));
 
@@ -275,13 +333,12 @@ export default function Home() {
         userIsDone: false,
       });
 
-      // Call smart conversation API
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message,
-          conversationId: activeConversation.id !== "temp" ? activeConversation.id : null,
+          conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
           existingMessages: activeConversation.messages,
           conversationType: activeConversation.type,
           userIsDone: false,
@@ -303,7 +360,6 @@ export default function Home() {
       console.log("📝 Title from API:", data.title);
       console.log("💬 Messages from API:", data.messages);
 
-      // Add assistant response to conversation
       const assistantMessage: Message = {
         role: "assistant",
         content: data.response,
@@ -313,7 +369,6 @@ export default function Home() {
       const finalMessages = [...updatedMessages, assistantMessage];
       console.log("📚 Final messages array:", finalMessages);
 
-      // Update conversation with response and save to database
       const updatedConversation = {
         ...activeConversation,
         id: data.conversationId || activeConversation.id,
@@ -330,7 +385,6 @@ export default function Home() {
       await loadConversations();
       console.log("✅ Conversations list reloaded");
 
-      // Speak the response
       if (data.response) {
         console.log("🔊 Speaking response:", data.response.substring(0, 50) + "...");
         speakAnswer(data.response);
@@ -555,11 +609,42 @@ export default function Home() {
     return null;
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
+        <Loader2 className="h-12 w-12 animate-spin text-purple-600" />
+      </div>
+    );
+  }
+
   if (viewingItem) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex items-center gap-2">
           <ThemeSwitch />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={currentUser?.profile?.avatarurl || currentUser?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                  <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -597,8 +682,31 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900">
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
         <ThemeSwitch />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={currentUser?.profile?.avatarurl || currentUser?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
+                <AvatarFallback>{getUserInitials()}</AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="flex h-screen">
@@ -607,28 +715,6 @@ export default function Home() {
           <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
             <div className="p-6">
               <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Conversations</h2>
-              
-              {/* OpenAI Test Button */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    const response = await fetch('/api/test-openai');
-                    const data = await response.json();
-                    if (data.success) {
-                      alert(`✅ OpenAI is working!\n\nResponse: ${data.response}\nModel: ${data.model}`);
-                    } else {
-                      alert(`❌ OpenAI Error:\n\n${data.error}\n\n${data.details || ''}`);
-                    }
-                  } catch (error) {
-                    alert('❌ Failed to test OpenAI API');
-                  }
-                }}
-                className="w-full mb-4 text-sm"
-              >
-                🧪 Test OpenAI API
-              </Button>
               
               <Button
                 size="lg"
@@ -639,7 +725,6 @@ export default function Home() {
                 New Conversation
               </Button>
 
-              {/* Microphone Test Button */}
               <Button
                 size="lg"
                 variant="outline"
