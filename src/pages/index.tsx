@@ -155,20 +155,19 @@ export default function Home() {
   };
 
   const startNewConversation = () => {
-    const newConversation: Conversation = {
+    console.log("🆕 Starting new conversation...");
+    const newConv: Conversation = {
       id: `temp-${Date.now()}`,
       title: "New Conversation",
       messages: [],
-      type: "general",
-      status: "active",
+      type: "general" as const,
+      status: "active" as const,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setActiveConversation(newConversation);
+    setActiveConversation(newConv);
     setConversationMode("active");
-    setCurrentQuestion("");
-    setCurrentAnswer("");
-    setError("");
+    console.log("✅ New conversation created and set as active:", newConv);
   };
 
   const resumeConversation = (conversation: Conversation) => {
@@ -222,17 +221,36 @@ export default function Home() {
     console.log("📋 Current activeConversation:", activeConversation);
     console.log("🎯 Current conversationMode:", conversationMode);
 
-    if (!message.trim()) {
-      console.warn("⚠️ Empty message, ignoring");
+    // Validate conversation state - if no active conversation, create one
+    if (!activeConversation) {
+      console.log("⚠️ No active conversation found, creating new one...");
+      const newConversation: Conversation = {
+        id: `temp-${Date.now()}`,
+        title: "New Conversation",
+        messages: [],
+        type: "general" as const,
+        status: "active" as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setActiveConversation(newConversation);
+      setConversationMode("active");
+      console.log("✅ Created new conversation:", newConversation);
+      // Re-run this function with the new conversation
+      setTimeout(() => handleConversationMessage(message), 100);
       return;
     }
 
+    if (conversationMode !== "active") {
+      console.log("⚠️ Conversation mode is not active, setting to active...");
+      setConversationMode("active");
+    }
+
+    console.log("🚀 Starting conversation message processing...");
+
     setIsProcessing(true);
-    setError(null);
 
     try {
-      console.log("🚀 Starting conversation message processing...");
-      
       // Add user message to conversation
       const userMessage: Message = {
         role: "user",
