@@ -10,7 +10,6 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Get Supabase token from Authorization header
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Not authenticated" });
@@ -18,7 +17,6 @@ export default async function handler(
 
   const token = authHeader.split(" ")[1];
 
-  // Verify token and get user
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
@@ -32,8 +30,7 @@ export default async function handler(
       const { data, error } = await supabase
         .from("saved_items")
         .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+        .order("updated_at", { ascending: false });
 
       if (error) throw error;
       return res.status(200).json({ items: data || [] });
@@ -44,7 +41,7 @@ export default async function handler(
 
   if (req.method === "POST") {
     try {
-      const { title, content, type } = req.body;
+      const { title, content, type, metadata } = req.body;
 
       const { data, error } = await supabase
         .from("saved_items")
@@ -52,7 +49,7 @@ export default async function handler(
           title,
           content,
           type,
-          user_id: userId,
+          metadata: metadata || null,
         })
         .select()
         .single();
@@ -71,8 +68,7 @@ export default async function handler(
       const { error } = await supabase
         .from("saved_items")
         .delete()
-        .eq("id", id)
-        .eq("user_id", userId);
+        .eq("id", id);
 
       if (error) throw error;
       return res.status(200).json({ success: true });
