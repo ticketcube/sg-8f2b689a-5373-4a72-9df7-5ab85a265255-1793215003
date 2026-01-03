@@ -18,13 +18,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
 
+type ConversationState = "idle" | "listening" | "processing" | "speaking" | "waiting";
+
 export default function Home() {
   const router = useRouter();
-  const [isListening, setIsListening] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [conversationState, setConversationState] = useState<ConversationState>("idle");
   const [currentQuestion, setCurrentQuestion] = useState("");
-  const [currentAnswer, setCurrentAnswer] = useState("");
   const [error, setError] = useState("");
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [viewingItem, setViewingItem] = useState<SavedItem | null>(null);
@@ -33,11 +32,11 @@ export default function Home() {
   // Conversation management
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-  const [conversationMode, setConversationMode] = useState<"idle" | "active" | "ending" | "saving" | "editing_title">("idle");
   const [showSidebar, setShowSidebar] = useState(true);
   
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
+  const currentTranscriptRef = useRef<string>("");
 
   useEffect(() => {
     // Get current user
@@ -69,36 +68,25 @@ export default function Home() {
 
         recognitionRef.current.onstart = () => {
           console.log("🎤 Speech recognition STARTED");
-          setIsListening(true);
         };
 
         recognitionRef.current.onresult = (event: any) => {
-          console.log("🎤 Speech detected! Event:", event);
-          
           const resultIndex = event.resultIndex;
           const result = event.results[resultIndex];
-          
-          console.log("Result details:", {
-            isFinal: result.isFinal,
-            confidence: result[0].confidence,
-            transcript: result[0].transcript
-          });
 
           if (result.isFinal) {
             const transcript = result[0].transcript;
             console.log("✅ Final transcript:", transcript);
-            
+            currentTranscriptRef.current = transcript;
             setCurrentQuestion(transcript);
-            console.log("📞 Calling handleConversationMessage with activeConversation:", activeConversation);
-            handleConversationMessage(transcript, activeConversation);
           } else {
             console.log("⏳ Interim result:", result[0].transcript);
+            setCurrentQuestion(result[0].transcript);
           }
         };
 
         recognitionRef.current.onerror = (event: any) => {
           console.error("❌ Speech recognition error:", event.error);
-          console.error("Error details:", event);
           
           let errorMessage = "Sorry, I couldn't hear you clearly. ";
           
@@ -120,28 +108,11 @@ export default function Home() {
           }
           
           setError(errorMessage);
-          setIsListening(false);
+          setConversationState("waiting");
         };
 
         recognitionRef.current.onend = () => {
           console.log("🛑 Speech recognition ended");
-          setIsListening(false);
-        };
-
-        recognitionRef.current.onspeechstart = () => {
-          console.log("🗣️ Speech detected - user is speaking!");
-        };
-
-        recognitionRef.current.onspeechend = () => {
-          console.log("🤫 Speech ended - user stopped speaking");
-        };
-
-        recognitionRef.current.onaudiostart = () => {
-          console.log("🔊 Audio capture started");
-        };
-
-        recognitionRef.current.onaudioend = () => {
-          console.log("🔇 Audio capture ended");
         };
       } else {
         setError("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
@@ -156,6 +127,13 @@ export default function Home() {
     return () => {
       if (synthRef.current) {
         synthRef.current.cancel();
+      }
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // Ignore if already stopped
+        }
       }
     };
   }, [currentUser]);
@@ -185,24 +163,6 @@ export default function Home() {
       });
       const data = await response.json();
       setConversations(data.conversations || []);
-    } catch (error) {
-      console.error("Error loading conversations:", error);
-    }
-  };
-
-  const loadSavedConversations = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-
-      const { data, error } = await supabase
-        .from("conversations")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setConversations(data || []);
     } catch (error) {
       console.error("Error loading conversations:", error);
     }
@@ -248,47 +208,81 @@ export default function Home() {
     };
     console.log("✅ New conversation created:", newConv);
     setActiveConversation(newConv);
-    setConversationMode("active");
-    console.log("✅ State updated - conversationMode set to 'active'");
-  };
-
-  const resumeConversation = (conversation: Conversation) => {
-    console.log("▶️ Resuming conversation:", conversation.id);
-    setActiveConversation(conversation);
-    setConversationMode("active");
+    setConversationState("idle");
     setCurrentQuestion("");
-    setCurrentAnswer("");
     setError("");
   };
 
-  const testMicrophone = () => {
-    if (!recognitionRef.current) {
-      alert("❌ Speech recognition not initialized!\n\nYour browser might not support it.\nPlease use Chrome or Edge.");
-      return;
+  const resumeConversation = async (conversation: Conversation) => {
+    console.log("▶️ Resuming conversation:", conversation.id);
+    setActiveConversation(conversation);
+    setConversationState("processing");
+    setCurrentQuestion("");
+    setError("");
+
+    // Send proactive greeting based on conversation type
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch("/api/smart-conversation", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          message: "__RESUME_CONVERSATION__", // Special flag for API
+          conversationId: conversation.id,
+          existingMessages: conversation.messages,
+          conversationType: conversation.type,
+          userIsDone: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to resume conversation");
+      }
+
+      const data = await response.json();
+
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: data.response,
+        timestamp: new Date(),
+      };
+
+      const updatedConversation = {
+        ...conversation,
+        messages: [...conversation.messages, assistantMessage],
+        updated_at: new Date().toISOString(),
+      };
+
+      setActiveConversation(updatedConversation);
+      speakAnswer(data.response);
+      setConversationState("waiting");
+    } catch (error) {
+      console.error("Error resuming conversation:", error);
+      setError("Failed to resume conversation");
+      setConversationState("waiting");
     }
-    
-    alert("✅ Microphone setup is ready!\n\n" +
-          "Speech recognition is initialized and ready to use.\n" +
-          "Make sure to:\n" +
-          "1. Allow microphone permissions\n" +
-          "2. Speak clearly and loud enough\n" +
-          "3. Check browser console for detailed logs");
   };
 
   const startListening = () => {
-    if (conversationMode === "idle") {
+    if (conversationState === "idle" && !activeConversation) {
       setError("Please start a new conversation first");
       return;
     }
 
     setError("");
-    console.log("🎤 Starting continuous voice recognition...");
+    setCurrentQuestion("");
+    currentTranscriptRef.current = "";
+    console.log("🎤 Starting voice recognition...");
     
     if (recognitionRef.current) {
       try {
         recognitionRef.current.start();
-        setIsListening(true);
-        console.log("✅ Continuous voice recognition started - will stay active");
+        setConversationState("listening");
+        console.log("✅ Voice recognition started");
       } catch (error) {
         console.error("Error starting recognition:", error);
         setError("Could not start listening. Please try again.");
@@ -303,45 +297,28 @@ export default function Home() {
     console.log("🛑 Stopping voice recognition...");
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-      setIsListening(false);
       console.log("✅ Voice recognition stopped");
+      
+      // Process the captured transcript
+      const finalTranscript = currentTranscriptRef.current;
+      if (finalTranscript.trim()) {
+        handleConversationMessage(finalTranscript);
+      } else {
+        setError("No speech detected. Please try again.");
+        setConversationState("waiting");
+      }
     }
   };
 
-  const handleConversationMessage = async (message: string, currentConversation: Conversation | null) => {
-    console.log("📝 handleConversationMessage ENTRY");
-    console.log("📝 Message:", message);
-    console.log("📝 Passed conversation:", currentConversation);
-    console.log("📝 State activeConversation:", activeConversation);
-    console.log("📝 conversationMode:", conversationMode);
-
-    // Use the passed conversation or create a new one
-    let workingConversation = currentConversation;
-
-    if (!workingConversation) {
-      console.log("⚠️ No conversation passed, creating new one...");
-      workingConversation = {
-        id: `temp-${Date.now()}`,
-        title: "New Conversation",
-        messages: [],
-        type: "general" as const,
-        status: "active" as const,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      console.log("✅ Created working conversation:", workingConversation);
-      setActiveConversation(workingConversation);
-      setConversationMode("active");
+  const handleConversationMessage = async (message: string) => {
+    console.log("📝 Processing message:", message);
+    
+    if (!activeConversation) {
+      console.error("❌ No active conversation");
+      return;
     }
 
-    if (conversationMode !== "active") {
-      console.log("⚠️ Conversation mode is not active, setting to active...");
-      setConversationMode("active");
-    }
-
-    console.log("🚀 Starting conversation message processing with conversation:", workingConversation.id);
-
-    setIsProcessing(true);
+    setConversationState("processing");
 
     try {
       const userMessage: Message = {
@@ -350,28 +327,16 @@ export default function Home() {
         timestamp: new Date(),
       };
 
-      const updatedMessages = [...workingConversation.messages, userMessage];
-      console.log("💬 Updated messages array:", updatedMessages);
+      const updatedMessages = [...activeConversation.messages, userMessage];
 
       const updatedConversation = {
-        ...workingConversation,
+        ...activeConversation,
         messages: updatedMessages,
       };
 
-      console.log("🔄 Setting activeConversation to updated version");
       setActiveConversation(updatedConversation);
 
-      console.log("📡 Preparing API call to /api/smart-conversation");
-      console.log("📦 API Request body:", {
-        message,
-        conversationId: workingConversation.id.startsWith("temp-") ? null : workingConversation.id,
-        existingMessages: workingConversation.messages,
-        conversationType: workingConversation.type,
-        userIsDone: false,
-      });
-
       const { data: { session } } = await supabase.auth.getSession();
-      console.log("🔑 Got session, token exists:", !!session?.access_token);
 
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
@@ -381,27 +346,19 @@ export default function Home() {
         },
         body: JSON.stringify({
           message,
-          conversationId: workingConversation.id.startsWith("temp-") ? null : workingConversation.id,
-          existingMessages: workingConversation.messages,
-          conversationType: workingConversation.type,
+          conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
+          existingMessages: activeConversation.messages,
+          conversationType: activeConversation.type,
           userIsDone: false,
         }),
       });
 
-      console.log("📬 API Response status:", response.status);
-      console.log("📬 API Response OK:", response.ok);
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("❌ API Error response:", errorData);
         throw new Error(errorData.error || "Failed to process message");
       }
 
       const data = await response.json();
-      console.log("✅ API Response data:", data);
-      console.log("🆔 Conversation ID from API:", data.conversationId);
-      console.log("📝 Title from API:", data.title);
-      console.log("💬 Messages from API:", data.messages);
 
       const assistantMessage: Message = {
         role: "assistant",
@@ -410,42 +367,76 @@ export default function Home() {
       };
 
       const finalMessages = [...updatedMessages, assistantMessage];
-      console.log("📚 Final messages array:", finalMessages);
 
       const finalConversation = {
-        ...workingConversation,
-        id: data.conversationId || workingConversation.id,
-        title: data.title || workingConversation.title,
+        ...activeConversation,
+        id: data.conversationId || activeConversation.id,
+        title: data.title || activeConversation.title,
         messages: data.messages || finalMessages,
-        type: data.conversationType || workingConversation.type,
+        type: data.conversationType || activeConversation.type,
         updated_at: new Date().toISOString(),
       };
 
-      console.log("🔄 Setting active conversation to final version:", finalConversation);
       setActiveConversation(finalConversation);
-
-      console.log("🔃 Reloading conversations list...");
       await loadConversations();
-      console.log("✅ Conversations list reloaded");
 
       if (data.response) {
-        console.log("🔊 Speaking response:", data.response.substring(0, 50) + "...");
         speakAnswer(data.response);
+      } else {
+        setConversationState("waiting");
       }
     } catch (error: any) {
-      console.error("❌ Error in handleConversationMessage:", error);
-      console.error("❌ Error stack:", error.stack);
+      console.error("❌ Error processing message:", error);
       setError("Sorry, I had trouble processing that. Please try again.");
-    } finally {
-      console.log("🏁 Processing complete, setting isProcessing to false");
-      setIsProcessing(false);
+      setConversationState("waiting");
     }
   };
 
-  const saveConversationToDatabase = async (conversation: Conversation) => {
+  const speakAnswer = (text: string) => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+
+      utterance.onstart = () => {
+        console.log("🔊 Started speaking");
+        setConversationState("speaking");
+      };
+      
+      utterance.onend = () => {
+        console.log("🔇 Finished speaking");
+        setConversationState("waiting");
+      };
+      
+      utterance.onerror = () => {
+        console.error("❌ Speech synthesis error");
+        setConversationState("waiting");
+        setError("Could not speak the answer");
+      };
+
+      synthRef.current.speak(utterance);
+    }
+  };
+
+  const stopSpeaking = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setConversationState("waiting");
+    }
+  };
+
+  const endAndSaveConversation = async () => {
+    if (!activeConversation) return;
+
     try {
-      const isNewConversation = conversation.id.startsWith("temp-");
+      setConversationState("processing");
+      
       const { data: { session } } = await supabase.auth.getSession();
+      
+      const isNewConversation = activeConversation.id.startsWith("temp-");
       
       if (isNewConversation) {
         const response = await fetch("/api/conversations", {
@@ -455,15 +446,13 @@ export default function Home() {
             "Authorization": `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
-            title: conversation.title,
-            messages: conversation.messages,
-            type: conversation.type,
+            title: activeConversation.title,
+            messages: activeConversation.messages,
+            type: activeConversation.type,
             status: "saved",
           }),
         });
-        const data = await response.json();
-        await loadConversations();
-        return data.conversation;
+        await response.json();
       } else {
         const response = await fetch("/api/conversations", {
           method: "PUT",
@@ -472,19 +461,27 @@ export default function Home() {
             "Authorization": `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
-            id: conversation.id,
-            title: conversation.title,
-            messages: conversation.messages,
+            id: activeConversation.id,
+            title: activeConversation.title,
+            messages: activeConversation.messages,
             status: "saved",
           }),
         });
-        const data = await response.json();
-        await loadConversations();
-        return data.conversation;
+        await response.json();
       }
+      
+      await loadConversations();
+      
+      // Reset to idle state
+      setActiveConversation(null);
+      setConversationState("idle");
+      setCurrentQuestion("");
+      
+      speakAnswer("Conversation saved successfully!");
     } catch (error) {
       console.error("Error saving conversation:", error);
-      throw error;
+      setError("Failed to save conversation");
+      setConversationState("waiting");
     }
   };
 
@@ -501,60 +498,12 @@ export default function Home() {
         await loadConversations();
         if (activeConversation?.id === id) {
           setActiveConversation(null);
-          setConversationMode("idle");
+          setConversationState("idle");
         }
       } catch (error) {
         console.error("Error deleting conversation:", error);
       }
     }
-  };
-
-  const speakAnswer = (text: string) => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.volume = 1;
-
-      utterance.onstart = () => {
-        console.log("🔊 Started speaking");
-        setIsSpeaking(true);
-        setIsProcessing(false);
-      };
-      
-      utterance.onend = () => {
-        console.log("🔇 Finished speaking");
-        setIsSpeaking(false);
-      };
-      
-      utterance.onerror = () => {
-        console.error("❌ Speech synthesis error");
-        setIsSpeaking(false);
-        setIsProcessing(false);
-        setError("Could not speak the answer");
-      };
-
-      synthRef.current.speak(utterance);
-    }
-  };
-
-  const stopSpeaking = () => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      setIsSpeaking(false);
-    }
-  };
-
-  const endAndSaveConversation = () => {
-    setConversationMode("saving");
-    speakAnswer(`Should I save this conversation as "${activeConversation?.title}"?`);
-  };
-
-  const startEditingTitle = () => {
-    setConversationMode("editing_title");
-    speakAnswer("What would you like to call this conversation?");
   };
 
   const deleteSavedItem = async (id: string) => {
@@ -582,6 +531,7 @@ export default function Home() {
       case "shopping":
         return <ShoppingCart className="h-5 w-5" />;
       case "moving":
+      case "inventory":
         return <Package className="h-5 w-5" />;
       case "email":
         return <Mail className="h-5 w-5" />;
@@ -666,33 +616,57 @@ export default function Home() {
     return null;
   };
 
-  const saveConversation = async () => {
-    if (!activeConversation || activeConversation.messages.length === 0) return;
+  const renderMainButton = () => {
+    switch (conversationState) {
+      case "idle":
+        return (
+          <button
+            onClick={startListening}
+            className="w-64 h-64 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-4xl font-bold shadow-2xl transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-3xl">START</span>
+              <span className="text-3xl">TALKING</span>
+            </div>
+          </button>
+        );
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        alert("You must be logged in to save conversations");
-        return;
-      }
+      case "listening":
+        return (
+          <button
+            onClick={stopListening}
+            className="w-64 h-64 rounded-full bg-red-500 text-white text-4xl font-bold shadow-2xl transform scale-110 animate-pulse transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-red-300"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Mic className="w-16 h-16 animate-pulse" />
+              <span className="text-2xl">STOP</span>
+              <span className="text-2xl">TALKING</span>
+            </div>
+          </button>
+        );
 
-      const conversationData = {
-        title: activeConversation.messages[0]?.content.substring(0, 100) || "New Conversation",
-        messages: activeConversation.messages,
-        user_id: session.user.id,
-      };
+      case "processing":
+        return (
+          <div className="w-64 h-64 rounded-full bg-yellow-500 text-white text-4xl font-bold shadow-2xl transform scale-105 transition-all duration-300 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="w-16 h-16 animate-spin" />
+              <span className="text-2xl">Thinking...</span>
+            </div>
+          </div>
+        );
 
-      const { error } = await supabase
-        .from("conversations")
-        .insert([conversationData]);
+      case "speaking":
+        return (
+          <div className="w-64 h-64 rounded-full bg-green-500 text-white text-4xl font-bold shadow-2xl transform scale-105 transition-all duration-300 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <Volume2 className="w-16 h-16 animate-pulse" />
+              <span className="text-2xl">Speaking...</span>
+            </div>
+          </div>
+        );
 
-      if (error) throw error;
-
-      alert("Conversation saved!");
-      loadSavedConversations();
-    } catch (error) {
-      console.error("Error saving conversation:", error);
-      alert("Failed to save conversation");
+      case "waiting":
+        return null; // Show action buttons instead
     }
   };
 
@@ -805,49 +779,6 @@ export default function Home() {
                   New Conversation
                 </Button>
 
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={testMicrophone}
-                  className="w-full mb-4 text-sm"
-                >
-                  🎤 Test Microphone Setup
-                </Button>
-
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={async () => {
-                    try {
-                      console.log("🧪 Starting test-save API call...");
-                      const { data: { session } } = await supabase.auth.getSession();
-                      console.log("🔑 Got session for test, token exists:", !!session?.access_token);
-                      
-                      const response = await fetch("/api/test-save", {
-                        method: "POST",
-                        headers: {
-                          "Authorization": `Bearer ${session?.access_token}`,
-                        },
-                      });
-                      const data = await response.json();
-                      console.log("🧪 Test response:", data);
-                      
-                      if (data.success) {
-                        alert(`✅ Database save works! Conversation ID: ${data.conversationId}`);
-                        await loadConversations();
-                      } else {
-                        alert(`❌ Database save failed: ${data.error}`);
-                      }
-                    } catch (error: any) {
-                      console.error("🧪 Test error:", error);
-                      alert(`❌ Test failed: ${error.message}`);
-                    }
-                  }}
-                  className="w-full mb-4 text-sm"
-                >
-                  💾 Test Database Save
-                </Button>
-
                 <div className="space-y-2">
                   {conversations.map((conv) => {
                     const messageCount = Array.isArray(conv.messages)
@@ -899,82 +830,50 @@ export default function Home() {
                 <h1 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-2">
                   Lois's Assistant
                 </h1>
-                {activeConversation && conversationMode !== "idle" && (
+                {activeConversation && conversationState !== "idle" && (
                   <div className="flex items-center justify-center gap-2 mt-4">
                     <p className="text-xl text-gray-600 dark:text-gray-300">
                       Current: <span className="font-semibold text-purple-600 dark:text-purple-400">{activeConversation.title}</span>
                     </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={startEditingTitle}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col items-center gap-8 mb-12">
-                <button
-                  onClick={isListening ? stopListening : startListening}
-                  disabled={isProcessing || conversationMode === "idle"}
-                  className={`
-                    w-64 h-64 rounded-full text-white text-4xl font-bold
-                    shadow-2xl transform transition-all duration-300
-                    ${isListening 
-                      ? "bg-red-500 scale-110 animate-pulse" 
-                      : isProcessing 
-                      ? "bg-yellow-500 scale-105" 
-                      : isSpeaking
-                      ? "bg-green-500 scale-105"
-                      : conversationMode === "idle"
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-purple-600 hover:bg-purple-700 hover:scale-105"
-                    }
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    focus:outline-none focus:ring-4 focus:ring-purple-300
-                  `}
-                >
-                  {isListening ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <Mic className="w-16 h-16 animate-pulse" />
-                      <span className="text-2xl">Listening...</span>
-                      <span className="text-base">(Click to Stop)</span>
-                    </div>
-                  ) : isProcessing ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="w-16 h-16 animate-spin" />
-                      <span className="text-2xl">Thinking...</span>
-                      {isListening && <span className="text-base">(Still listening)</span>}
-                    </div>
-                  ) : isSpeaking ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <Volume2 className="w-16 h-16 animate-pulse" />
-                      <span className="text-2xl">Speaking...</span>
-                      {isListening && <span className="text-base">(Still listening)</span>}
-                    </div>
-                  ) : conversationMode === "idle" ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="text-2xl">Start New</span>
-                      <span className="text-2xl">Conversation</span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="text-3xl">START</span>
-                      <span className="text-3xl">TALKING</span>
-                    </div>
-                  )}
-                </button>
+                {/* Main Button */}
+                {renderMainButton()}
 
-                {conversationMode === "active" && activeConversation && activeConversation.messages.length > 0 && !isListening && (
+                {/* Interim Speech Display */}
+                {conversationState === "listening" && currentQuestion && (
+                  <Card className="p-6 w-full max-w-2xl bg-purple-50 dark:bg-purple-900/20">
+                    <p className="text-lg text-gray-700 dark:text-gray-300 italic">
+                      "{currentQuestion}"
+                    </p>
+                  </Card>
+                )}
+
+                {/* Stop Speaking Button (small, during AI speech) */}
+                {conversationState === "speaking" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={stopSpeaking}
+                    className="text-sm px-4 py-2"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Stop Speaking
+                  </Button>
+                )}
+
+                {/* Action Buttons (Continue or End) */}
+                {conversationState === "waiting" && activeConversation && activeConversation.messages.length > 0 && (
                   <div className="flex gap-4">
                     <Button
                       size="lg"
                       onClick={startListening}
-                      disabled={isProcessing || isSpeaking}
                       className="text-xl px-8 py-6"
                     >
+                      <Mic className="mr-2 h-6 w-6" />
                       Continue Talking
                     </Button>
                     <Button
@@ -988,28 +887,7 @@ export default function Home() {
                   </div>
                 )}
 
-                {isListening && (
-                  <div className="text-center">
-                    <p className="text-xl font-semibold text-purple-600 dark:text-purple-400 mb-2">
-                      🎤 Microphone Active - Speak anytime
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      I'll listen while thinking and speaking
-                    </p>
-                  </div>
-                )}
-
-                {isSpeaking && (
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={stopSpeaking}
-                    className="text-xl px-8 py-6"
-                  >
-                    Stop Speaking
-                  </Button>
-                )}
-
+                {/* Error Display */}
                 {error && (
                   <Card className="p-6 bg-red-50 dark:bg-red-900/20 border-red-200 w-full max-w-2xl">
                     <p className="text-red-600 dark:text-red-400 text-lg font-semibold text-center">
@@ -1018,6 +896,7 @@ export default function Home() {
                   </Card>
                 )}
 
+                {/* Conversation Messages */}
                 {activeConversation &&
                   Array.isArray(activeConversation.messages) &&
                   activeConversation.messages.length > 0 && (
