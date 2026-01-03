@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import OpenAI from "openai";
+import type { ChatCompletionMessageParam, ChatCompletionMessage } from "openai/resources/chat/completions";
 import { createClient } from "@supabase/supabase-js";
 
 const openai = new OpenAI({
@@ -523,17 +524,31 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     }
 
     // Build messages array
-    const messages: ConversationMessage[] = [
+    const messages: ChatCompletionMessageParam[] = [
       {
         role: "system",
         content: systemPrompt,
       },
-      ...conversationMessages.map((m: any) => ({
-        role: m.role,
-        content: m.content,
-        tool_call_id: m.tool_call_id,
-        tool_calls: m.tool_calls
-      })),
+      ...conversationMessages.map((m: any): ChatCompletionMessageParam => {
+        if (m.role === "tool") {
+          return {
+            role: "tool",
+            content: m.content,
+            tool_call_id: m.tool_call_id
+          };
+        }
+        if (m.role === "assistant" && m.tool_calls) {
+          return {
+            role: "assistant",
+            content: m.content || null,
+            tool_calls: m.tool_calls
+          };
+        }
+        return {
+          role: m.role,
+          content: m.content
+        };
+      }),
       {
         role: "user",
         content: message,
@@ -555,28 +570,37 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
     // Handle function calls
     if (toolCalls && toolCalls.length > 0) {
-      const functionMessages = [...messages, completion.choices[0].message];
+      const functionMessages: ChatCompletionMessageParam[] = [
+        ...messages, 
+        {
+          role: "assistant",
+          content: completion.choices[0].message.content,
+          tool_calls: completion.choices[0].message.tool_calls
+        }
+      ];
 
       // Execute each function call
       for (const toolCall of toolCalls) {
-        const functionName = toolCall.function.name;
-        const functionArgs = JSON.parse(toolCall.function.arguments);
+        if (toolCall.type === "function") {
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments);
 
-        console.log(`🔧 Executing function: ${functionName}`, functionArgs);
+          console.log(`🔧 Executing function: ${functionName}`, functionArgs);
 
-        const functionResult = await executeFunctionCall(
-          functionName,
-          functionArgs,
-          userId,
-          incomingConversationId
-        );
+          const functionResult = await executeFunctionCall(
+            functionName,
+            functionArgs,
+            userId,
+            incomingConversationId
+          );
 
-        // Add function result to messages
-        functionMessages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(functionResult),
-        });
+          // Add function result to messages
+          functionMessages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(functionResult),
+          });
+        }
       }
 
       // Get final response from AI with function results
