@@ -17,6 +17,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
+import { speak } from "@/lib/tts";
 
 type ConversationState = "idle" | "listening" | "processing" | "speaking" | "waiting";
 
@@ -26,6 +27,7 @@ export default function Home() {
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [error, setError] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   
   // Conversation management
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -33,7 +35,7 @@ export default function Home() {
   const [showSidebar, setShowSidebar] = useState(false);
   
   const recognitionRef = useRef<any>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentTranscriptRef = useRef<string>("");
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setCurrentUser(session.user);
+        setAccessToken(session.access_token);
       }
     };
 
@@ -49,8 +52,6 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== "undefined" && currentUser) {
-      synthRef.current = window.speechSynthesis;
-      
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
@@ -115,8 +116,9 @@ export default function Home() {
     }
 
     return () => {
-      if (synthRef.current) {
-        synthRef.current.cancel();
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
       }
       if (recognitionRef.current) {
         try {
@@ -231,7 +233,7 @@ export default function Home() {
       };
 
       setActiveConversation(updatedConversation);
-      speakAnswer(data.response);
+      await speakAnswer(data.response);
       setConversationState("waiting");
     } catch (error) {
       console.error("Error resuming conversation:", error);
@@ -345,7 +347,7 @@ export default function Home() {
       await loadConversations();
 
       if (data.response) {
-        speakAnswer(data.response);
+        await speakAnswer(data.response);
       } else {
         setConversationState("waiting");
       }
@@ -356,35 +358,47 @@ export default function Home() {
     }
   };
 
-  const speakAnswer = (text: string) => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.volume = 1;
+  const speakAnswer = async (text: string) => {
+    try {
+      setConversationState("speaking");
 
-      utterance.onstart = () => {
-        setConversationState("speaking");
-      };
-      
-      utterance.onend = () => {
-        setConversationState("waiting");
-      };
-      
-      utterance.onerror = () => {
-        setConversationState("waiting");
-        setError("Could not speak the answer");
-      };
+      // Use OpenAI TTS with automatic fallback to browser TTS
+      const audio = await speak(text, accessToken, {
+        provider: "openai",
+        voice: "nova",
+        speed: 1.0,
+      });
 
-      synthRef.current.speak(utterance);
+      if (audio instanceof HTMLAudioElement) {
+        currentAudioRef.current = audio;
+
+        audio.onended = () => {
+          setConversationState("waiting");
+          currentAudioRef.current = null;
+        };
+
+        audio.onerror = () => {
+          setConversationState("waiting");
+          setError("Could not play audio");
+          currentAudioRef.current = null;
+        };
+
+        await audio.play();
+      } else {
+        // Browser TTS (returns void)
+        setConversationState("waiting");
+      }
+    } catch (error) {
+      console.error("TTS Error:", error);
+      setConversationState("waiting");
+      setError("Could not speak the answer");
     }
   };
 
   const stopSpeaking = () => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
       setConversationState("waiting");
     }
   };
@@ -437,7 +451,7 @@ export default function Home() {
       setConversationState("idle");
       setCurrentQuestion("");
       
-      speakAnswer("Conversation saved successfully!");
+      await speakAnswer("Conversation saved successfully!");
     } catch (error) {
       console.error("Error saving conversation:", error);
       setError("Failed to save conversation");
@@ -486,7 +500,7 @@ export default function Home() {
         return (
           <button
             onClick={startListening}
-            className="w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-2xl transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-500"
+            className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-2xl transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-500"
           >
             <div className="flex flex-col items-center gap-2">
               <span className="text-2xl sm:text-3xl md:text-4xl font-bold">START</span>
@@ -499,7 +513,7 @@ export default function Home() {
         return (
           <button
             onClick={stopListening}
-            className="w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-red-500 to-red-600 text-white shadow-2xl transform scale-105 animate-pulse transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-red-300"
+            className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-red-500 to-red-600 text-white shadow-2xl transform scale-105 animate-pulse transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-red-300"
           >
             <div className="flex flex-col items-center gap-3">
               <Mic className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 animate-pulse" />
@@ -511,7 +525,7 @@ export default function Home() {
 
       case "processing":
         return (
-          <div className="w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-2xl transform scale-105 transition-all duration-300 flex items-center justify-center">
+          <div className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-2xl transform scale-105 transition-all duration-300 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 animate-spin" />
               <span className="text-xl sm:text-2xl md:text-3xl font-bold">Thinking...</span>
@@ -521,7 +535,7 @@ export default function Home() {
 
       case "speaking":
         return (
-          <div className="w-60 h-60 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-green-500 to-green-600 text-white shadow-2xl transform scale-105 transition-all duration-300 flex items-center justify-center">
+          <div className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-green-500 to-green-600 text-white shadow-2xl transform scale-105 transition-all duration-300 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <Volume2 className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 animate-pulse" />
               <span className="text-xl sm:text-2xl md:text-3xl font-bold">Speaking...</span>
