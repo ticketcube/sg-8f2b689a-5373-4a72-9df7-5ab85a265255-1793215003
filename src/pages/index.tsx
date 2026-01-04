@@ -22,6 +22,7 @@ import { speak } from "@/lib/tts";
 type ConversationState = "idle" | "listening" | "processing" | "speaking" | "waiting";
 
 export default function Home() {
+  console.log("🟢 APP_INIT: Component mounted");
   const router = useRouter();
   const [conversationState, setConversationState] = useState<ConversationState>("idle");
   const [currentQuestion, setCurrentQuestion] = useState("");
@@ -48,6 +49,17 @@ export default function Home() {
     };
 
     getCurrentUser();
+  }, []);
+
+  // Check speech recognition support
+  useEffect(() => {
+    const isSupported = typeof window !== "undefined" && 
+      ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+    console.log("🟢 SPEECH_CHECK: Speech recognition supported =", isSupported);
+    
+    if (!isSupported) {
+      console.log("🔴 SPEECH_ERROR: Speech recognition not available in this browser");
+    }
   }, []);
 
   useEffect(() => {
@@ -243,39 +255,31 @@ export default function Home() {
   };
 
   const startListening = () => {
-    if (conversationState === "idle" && !activeConversation) {
-      setError("Please start a new conversation first");
+    console.log("🟢 MIC_CLICK: User clicked microphone button");
+    
+    if (!recognitionRef.current) {
+      console.log("🔴 RECORDING_ERROR: Recognition not initialized");
+      setError("Speech recognition not available");
       return;
     }
 
-    setError("");
-    setCurrentQuestion("");
-    currentTranscriptRef.current = "";
-    
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-        setConversationState("listening");
-      } catch (error) {
-        console.error("Error starting recognition:", error);
-        setError("Could not start listening. Please try again.");
-      }
-    } else {
-      setError("Speech recognition is not available in your browser");
+    try {
+      console.log("🟢 RECORDING_START: Starting speech recognition");
+      recognitionRef.current.start();
+      setConversationState("listening");
+      setCurrentQuestion("");
+      setError("");
+    } catch (err) {
+      console.error("🔴 RECORDING_ERROR:", err);
+      setError("Failed to start recording");
     }
   };
 
   const stopListening = () => {
+    console.log("🟢 RECORDING_STOP: Stopping speech recognition");
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-      
-      const finalTranscript = currentTranscriptRef.current;
-      if (finalTranscript.trim()) {
-        handleConversationMessage(finalTranscript);
-      } else {
-        setError("No speech detected. Please try again.");
-        setConversationState("waiting");
-      }
+      setConversationState("waiting");
     }
   };
 

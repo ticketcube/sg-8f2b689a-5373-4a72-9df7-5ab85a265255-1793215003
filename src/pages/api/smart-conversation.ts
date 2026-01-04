@@ -161,9 +161,12 @@ async function executeFunctionCall(
   userId: string,
   conversationId?: string
 ): Promise<any> {
+  console.log("🟦 FUNCTION_EXEC: Starting", functionName, "for user", userId);
+  
   try {
     switch (functionName) {
       case "save_shopping_list": {
+        console.log("🟦 FUNCTION_EXEC: save_shopping_list with", args.items?.length || 0, "items");
         const { items } = args;
         
         // Check if shopping list already exists for this conversation
@@ -176,6 +179,7 @@ async function executeFunctionCall(
             .eq("metadata->>conversation_id", conversationId)
             .single();
           existingList = data;
+          console.log("🟦 DB_CHECK: Existing shopping list =", existingList ? "found" : "not found");
         }
 
         if (existingList) {
@@ -195,6 +199,8 @@ async function executeFunctionCall(
             }
           });
 
+          console.log("🟦 DB_OPERATION: Updating shopping list, merged items =", mergedItems.length);
+
           const { data, error } = await supabase
             .from("saved_items")
             .update({
@@ -206,8 +212,11 @@ async function executeFunctionCall(
             .single();
 
           if (error) throw error;
+          console.log("🟦 FUNCTION_SUCCESS: Shopping list updated");
           return { success: true, itemCount: mergedItems.length, items: mergedItems };
         } else {
+          console.log("🟦 DB_OPERATION: Creating new shopping list");
+          
           // Create new shopping list
           const { data, error } = await supabase
             .from("saved_items")
@@ -221,6 +230,7 @@ async function executeFunctionCall(
             .single();
 
           if (error) throw error;
+          console.log("🟦 FUNCTION_SUCCESS: New shopping list created");
           return { success: true, itemCount: items.length, items };
         }
       }
@@ -403,10 +413,11 @@ async function executeFunctionCall(
       }
 
       default:
+        console.log("🔴 FUNCTION_ERROR: Unknown function", functionName);
         return { success: false, error: "Unknown function" };
     }
   } catch (error: any) {
-    console.error(`Function execution error (${functionName}):`, error);
+    console.error("🔴 FUNCTION_ERROR:", functionName, error);
     return { success: false, error: error.message };
   }
 }
@@ -415,13 +426,17 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  console.log("🟦 API_RECEIVED: New request to smart-conversation endpoint");
+  
   if (req.method !== "POST") {
+    console.log("🔴 API_ERROR: Invalid method =", req.method);
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   // Get Supabase token from Authorization header
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.log("🔴 AUTH_ERROR: No authorization header or invalid format");
     return res.status(401).json({ error: "Not authenticated" });
   }
 
@@ -431,15 +446,26 @@ export default async function handler(
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
+    console.log("🔴 AUTH_ERROR: Invalid token or user not found", authError);
     return res.status(401).json({ error: "Invalid token" });
   }
 
   const userId = user.id;
+  console.log("🟦 AUTH_CHECK: User authenticated, userId =", userId);
 
   try {
     const { message, conversationMessages = [], mode = "conversation", conversationId: incomingConversationId } = req.body;
 
+    console.log("🟦 MESSAGE_RECEIVED:", {
+      messageLength: message?.length || 0,
+      messagePreview: message?.substring(0, 50) || "none",
+      conversationMessagesCount: conversationMessages.length,
+      mode,
+      conversationId: incomingConversationId || "new"
+    });
+
     if (!message || typeof message !== "string") {
+      console.log("🔴 VALIDATION_ERROR: Message is required or invalid type");
       return res.status(400).json({ error: "Message is required" });
     }
 
@@ -555,6 +581,11 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       },
     ];
 
+    console.log("🟦 OPENAI_REQUEST: Preparing to call OpenAI");
+    console.log("🟦 OPENAI_REQUEST: Message count =", messages.length);
+    console.log("🟦 OPENAI_REQUEST: Mode =", mode);
+    console.log("🟦 OPENAI_REQUEST: Tools enabled =", mode === "conversation");
+
     // Get AI response with function calling
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -565,11 +596,17 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       max_tokens: mode === "title_edit" ? 100 : 500,
     });
 
+    console.log("🟦 OPENAI_RESPONSE: Received response");
+
     let aiResponse = completion.choices[0].message.content || "";
     const toolCalls = completion.choices[0].message.tool_calls;
 
+    console.log("🟦 OPENAI_RESPONSE: Tool calls =", toolCalls?.length || 0);
+
     // Handle function calls
     if (toolCalls && toolCalls.length > 0) {
+      console.log("🟦 FUNCTION_EXECUTION: Processing", toolCalls.length, "function calls");
+      
       const functionMessages: ChatCompletionMessageParam[] = [
         ...messages, 
         {
@@ -585,7 +622,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
           const functionName = toolCall.function.name;
           const functionArgs = JSON.parse(toolCall.function.arguments);
 
-          console.log(`🔧 Executing function: ${functionName}`, functionArgs);
+          console.log("🟦 FUNCTION_CALL: Executing", functionName, "with args:", functionArgs);
 
           const functionResult = await executeFunctionCall(
             functionName,
@@ -593,6 +630,8 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
             userId,
             incomingConversationId
           );
+
+          console.log("🟦 FUNCTION_RESULT:", functionName, "=>", functionResult);
 
           // Add function result to messages
           functionMessages.push({
@@ -603,6 +642,8 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
         }
       }
 
+      console.log("🟦 OPENAI_REQUEST: Getting final response with function results");
+
       // Get final response from AI with function results
       const finalCompletion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
@@ -612,6 +653,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       });
 
       aiResponse = finalCompletion.choices[0].message.content || "Done!";
+      console.log("🟦 OPENAI_RESPONSE: Final response length =", aiResponse.length);
     }
 
     // Detect conversation type from messages
@@ -626,8 +668,12 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       conversationType = "email";
     }
 
+    console.log("🟦 CONVERSATION: Type detected =", conversationType);
+
     // Check if user indicates they're done
     const userIsDone = /\b(that'?s all|i'?m done|that'?s everything|finished|that'?s it)\b/i.test(message);
+
+    console.log("🟦 CONVERSATION: User done =", userIsDone);
 
     // Build updated messages array for database
     const updatedMessages = [
@@ -655,7 +701,8 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     
     try {
       if (incomingConversationId) {
-        // Update existing conversation
+        console.log("🟦 DB_OPERATION: Updating existing conversation", incomingConversationId);
+        
         const { error: updateError } = await supabase
           .from("conversations")
           .update({
@@ -667,8 +714,10 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
           .eq("user_id", userId);
 
         if (updateError) throw updateError;
+        console.log("🟦 DB_OPERATION: Conversation updated successfully");
       } else {
-        // Create new conversation
+        console.log("🟦 DB_OPERATION: Creating new conversation");
+        
         const { data: newConv, error: insertError } = await supabase
           .from("conversations")
           .insert({
@@ -685,15 +734,18 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
         
         if (newConv) {
           resultConversationId = newConv.id;
+          console.log("🟦 DB_OPERATION: New conversation created, id =", resultConversationId);
         }
       }
     } catch (dbError) {
-      console.error("💥 Database error:", dbError);
+      console.error("🔴 DB_ERROR: Failed to save conversation", dbError);
       return res.status(500).json({
         error: "Failed to save conversation to database",
         details: dbError instanceof Error ? dbError.message : "Unknown error",
       });
     }
+
+    console.log("🟦 API_SUCCESS: Sending response to client");
 
     return res.status(200).json({
       response: aiResponse,
@@ -705,7 +757,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     });
 
   } catch (error: any) {
-    console.error("Smart conversation error:", error);
+    console.error("🔴 API_ERROR: Unhandled error in smart-conversation", error);
     return res.status(500).json({
       error: "Failed to process conversation",
       details: error.message,
