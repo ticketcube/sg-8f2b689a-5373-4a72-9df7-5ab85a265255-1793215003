@@ -243,9 +243,8 @@ export default function Home() {
         body: JSON.stringify({
           message: "__RESUME_CONVERSATION__",
           conversationId: conversation.id,
-          existingMessages: conversation.messages,
-          conversationType: conversation.type,
-          userIsDone: false,
+          conversationMessages: conversation.messages,
+          mode: "conversation",
         }),
       });
 
@@ -377,9 +376,8 @@ export default function Home() {
         body: JSON.stringify({
           message,
           conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
-          existingMessages: activeConversation.messages,
-          conversationType: activeConversation.type,
-          userIsDone: false,
+          conversationMessages: activeConversation.messages,
+          mode: "conversation",
         }),
       });
 
