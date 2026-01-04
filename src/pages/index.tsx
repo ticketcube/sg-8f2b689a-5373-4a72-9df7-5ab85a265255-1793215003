@@ -22,7 +22,7 @@ import { speak } from "@/lib/tts";
 type ConversationState = "idle" | "listening" | "processing" | "speaking" | "waiting";
 
 export default function Home() {
-  console.log("🟢 APP_INIT: Component mounted");
+  console.log("🔄 RENDER: Component re-rendering");
   const router = useRouter();
   const [conversationState, setConversationState] = useState<ConversationState>("idle");
   const [currentQuestion, setCurrentQuestion] = useState("");
@@ -39,6 +39,11 @@ export default function Home() {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentTranscriptRef = useRef<string>("");
   const isRecognitionInitialized = useRef(false);
+
+  // Log ACTUAL mount (only once)
+  useEffect(() => {
+    console.log("🟢 APP_INIT: Component MOUNTED (first time only)");
+  }, []); // Empty array = runs only on mount
 
   // Initialize user session ONCE
   useEffect(() => {
