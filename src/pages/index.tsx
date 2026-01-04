@@ -286,6 +286,21 @@ export default function Home() {
       return;
     }
 
+    // Auto-create conversation if none exists
+    if (!activeConversation) {
+      console.log("🟢 AUTO_CREATE: Creating new conversation automatically");
+      const newConv: Conversation = {
+        id: `temp-${Date.now()}`,
+        title: "New Conversation",
+        messages: [],
+        type: "general" as const,
+        status: "active" as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setActiveConversation(newConv);
+    }
+
     try {
       console.log("🟢 RECORDING_START: Starting speech recognition");
       recognitionRef.current.start();
@@ -317,13 +332,21 @@ export default function Home() {
   };
 
   const handleConversationMessage = async (message: string) => {
+    console.log("🟢 HANDLE_MESSAGE: Starting to process message");
+    console.log("🟢 HANDLE_MESSAGE: activeConversation =", activeConversation ? "exists" : "NULL");
+    
     if (!activeConversation) {
+      console.log("🔴 HANDLE_MESSAGE_ERROR: No active conversation!");
+      setError("Please start a conversation first");
+      setConversationState("waiting");
       return;
     }
 
+    console.log("🟢 HANDLE_MESSAGE: Setting state to processing");
     setConversationState("processing");
 
     try {
+      console.log("🟢 HANDLE_MESSAGE: Creating user message");
       const userMessage: Message = {
         role: "user",
         content: message,
@@ -339,7 +362,11 @@ export default function Home() {
 
       setActiveConversation(updatedConversation);
 
+      console.log("🟢 API_CALL: Getting session token");
       const { data: { session } } = await supabase.auth.getSession();
+      
+      console.log("🟢 API_CALL: Session =", session ? "valid" : "NULL");
+      console.log("🟢 API_CALL: Sending request to /api/smart-conversation");
 
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
@@ -356,12 +383,16 @@ export default function Home() {
         }),
       });
 
+      console.log("🟢 API_RESPONSE: Status =", response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.log("🔴 API_ERROR: Response =", errorData);
         throw new Error(errorData.error || "Failed to process message");
       }
 
       const data = await response.json();
+      console.log("🟢 API_SUCCESS: Got response from AI");
 
       const assistantMessage: Message = {
         role: "assistant",
@@ -384,12 +415,13 @@ export default function Home() {
       await loadConversations();
 
       if (data.response) {
+        console.log("🟢 TTS: Starting to speak response");
         await speakAnswer(data.response);
       } else {
         setConversationState("waiting");
       }
     } catch (error: any) {
-      console.error("❌ Error processing message:", error);
+      console.error("🔴 HANDLE_MESSAGE_ERROR:", error);
       setError("Sorry, I had trouble processing that. Please try again.");
       setConversationState("waiting");
     }
