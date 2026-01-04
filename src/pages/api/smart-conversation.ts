@@ -66,7 +66,7 @@ const tools = [
     type: "function" as const,
     function: {
       name: "save_inventory_item",
-      description: "Save an item to the moving/storage inventory. Use when user mentions packing, storing, or organizing items for moving.",
+      description: "Save an item to the moving/storage inventory. Use when user mentions organizing items in the loft or moving items.",
       parameters: {
         type: "object",
         properties: {
@@ -74,24 +74,25 @@ const tools = [
             type: "string",
             description: "Name of the item being stored or moved"
           },
-          location: {
+          floor: {
             type: "string",
-            description: "Where the item is stored (e.g., 'loft', 'garage', 'box 3', 'storage unit')"
+            description: "Floor number where item is located: '5', '6', or 'basement'",
+            enum: ["5", "6", "basement"]
+          },
+          city: {
+            type: "string",
+            description: "City where the item will be shipped (e.g., 'Boston', 'Chicago', 'Seattle')"
           },
           recipient: {
             type: "string",
-            description: "Who should receive this item if giving away"
-          },
-          box_number: {
-            type: "string",
-            description: "Box or container number if applicable"
+            description: "Name of person who should receive this item (e.g., 'Sarah', 'Michael', 'Tom')"
           },
           notes: {
             type: "string",
             description: "Additional notes about the item"
           }
         },
-        required: ["item_name"]
+        required: ["item_name", "floor", "city", "recipient"]
       }
     }
   },
@@ -253,7 +254,9 @@ async function executeFunctionCall(
       }
 
       case "save_inventory_item": {
-        const { item_name, location, recipient, box_number, notes } = args;
+        const { item_name, floor, city, recipient, notes } = args;
+
+        console.log("🟦 FUNCTION_EXEC: save_inventory_item with item =", item_name, "floor =", floor, "city =", city, "recipient =", recipient);
 
         // Check if inventory exists for this conversation
         let existingInventory;
@@ -268,16 +271,33 @@ async function executeFunctionCall(
         }
 
         const newItem = {
-          item: item_name,
-          location,
+          name: item_name,
+          floor,
+          city,
           recipient,
-          box_number,
-          notes
+          notes: notes || ""
         };
 
         if (existingInventory) {
-          // Update existing inventory
+          // Check for duplicates
           const currentItems = existingInventory.content.items || [];
+          const duplicate = currentItems.find((item: any) => 
+            item.name.toLowerCase() === item_name.toLowerCase() &&
+            item.floor === floor &&
+            item.recipient.toLowerCase() === recipient.toLowerCase()
+          );
+
+          if (duplicate) {
+            console.log("🟦 FUNCTION_RESULT: Duplicate found, not adding");
+            return { 
+              success: true, 
+              isDuplicate: true, 
+              message: `${item_name} on floor ${floor} for ${recipient} is already on your list`,
+              itemCount: currentItems.length
+            };
+          }
+
+          // Update existing inventory
           const updatedItems = [...currentItems, newItem];
 
           const { data, error } = await supabase
@@ -291,7 +311,8 @@ async function executeFunctionCall(
             .single();
 
           if (error) throw error;
-          return { success: true, itemCount: updatedItems.length };
+          console.log("🟦 FUNCTION_SUCCESS: Inventory updated, total items =", updatedItems.length);
+          return { success: true, itemCount: updatedItems.length, addedItem: newItem };
         } else {
           // Create new inventory
           const { data, error } = await supabase
@@ -299,7 +320,7 @@ async function executeFunctionCall(
             .insert({
               user_id: userId,
               type: "moving",
-              title: "Moving Inventory",
+              title: "Loft Inventory",
               content: { items: [newItem] },
               metadata: conversationId ? { conversation_id: conversationId } : null
             })
@@ -307,12 +328,15 @@ async function executeFunctionCall(
             .single();
 
           if (error) throw error;
-          return { success: true, itemCount: 1 };
+          console.log("🟦 FUNCTION_SUCCESS: New inventory created");
+          return { success: true, itemCount: 1, addedItem: newItem };
         }
       }
 
       case "get_inventory": {
         const { location } = args;
+
+        console.log("🟦 FUNCTION_EXEC: get_inventory with location filter =", location || "none");
 
         const { data, error } = await supabase
           .from("saved_items")
@@ -323,18 +347,23 @@ async function executeFunctionCall(
           .single();
 
         if (error || !data) {
+          console.log("🟦 FUNCTION_RESULT: No inventory found");
           return { success: true, items: [], message: "No inventory found" };
         }
 
         let items = data.content.items || [];
         
-        // Filter by location if specified
+        // Filter by location (floor, city, or recipient) if specified
         if (location) {
+          const searchTerm = location.toLowerCase();
           items = items.filter((item: any) => 
-            item.location?.toLowerCase().includes(location.toLowerCase())
+            item.floor?.toLowerCase().includes(searchTerm) ||
+            item.city?.toLowerCase().includes(searchTerm) ||
+            item.recipient?.toLowerCase().includes(searchTerm)
           );
         }
 
+        console.log("🟦 FUNCTION_RESULT: Found", items.length, "items");
         return { 
           success: true, 
           items,
@@ -510,15 +539,27 @@ Keep your response brief and friendly.`;
 
 CONVERSATION TYPES & WHEN TO USE FUNCTIONS:
 1. SHOPPING LISTS - Use save_shopping_list() when user mentions items to buy
-2. MOVING/INVENTORY - Use save_inventory_item() when user mentions packing, storing, or organizing items
+2. LOFT/MOVING INVENTORY - Use save_inventory_item() when user mentions organizing items in the loft
+   - Extract: item name, floor (5, 6, or basement), city destination, recipient name
+   - Example: "lamp on floor 5 going to Sarah in Boston"
 3. EMAIL DRAFTS - Use save_email_draft() when user is composing an email
 4. GENERAL Q&A - Answer questions conversationally
 
 FUNCTION CALLING RULES:
 - Call functions proactively as user mentions items/actions
-- Use get_* functions when you need to check what's already saved
+- Use get_inventory() when user asks "what's on my list", "who is X going to", "show me my items"
 - Always confirm what you saved after calling a function
 - Be natural - don't announce "I'm calling a function now"
+
+INVENTORY QUERIES:
+- "What's on my list?" → Use get_inventory() with no filter
+- "Who is the lamp going to?" → Use get_inventory(), then search for lamp in results
+- "What do I have for Sarah?" → Use get_inventory(location="Sarah")
+- "What's on floor 5?" → Use get_inventory(location="5")
+
+DUPLICATE DETECTION:
+- If function returns isDuplicate=true, tell user the item is already listed
+- Suggest updating instead of adding duplicate
 
 YOUR ROLE:
 - Be warm, patient, and conversational
@@ -663,21 +704,61 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
     console.log("🟦 CONVERSATION: User done =", userIsDone);
 
-    // Build updated messages array for database
-    const updatedMessages = [
+    // Build updated messages array for database - include tool calls and responses
+    const updatedMessages: ConversationMessage[] = [
       ...conversationMessages,
       {
         role: "user",
         content: message,
         timestamp: new Date().toISOString(),
-      },
-      {
+      } as ConversationMessage,
+    ];
+
+    // Add assistant message with tool calls if present
+    if (toolCalls && toolCalls.length > 0) {
+      updatedMessages.push({
+        role: "assistant",
+        content: completion.choices[0].message.content || null,
+        timestamp: new Date().toISOString(),
+        tool_calls: toolCalls,
+      } as ConversationMessage);
+
+      // Add tool response messages
+      for (const toolCall of toolCalls) {
+        if (toolCall.type === "function") {
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          const functionResult = await executeFunctionCall(
+            functionName,
+            functionArgs,
+            supabase,
+            userId,
+            incomingConversationId
+          );
+
+          updatedMessages.push({
+            role: "tool",
+            content: JSON.stringify(functionResult),
+            tool_call_id: toolCall.id,
+            timestamp: new Date().toISOString(),
+          } as ConversationMessage);
+        }
+      }
+
+      // Add final assistant response
+      updatedMessages.push({
         role: "assistant",
         content: aiResponse,
         timestamp: new Date().toISOString(),
-        tool_calls: toolCalls
-      },
-    ];
+      } as ConversationMessage);
+    } else {
+      // No tool calls, just add assistant response
+      updatedMessages.push({
+        role: "assistant",
+        content: aiResponse,
+        timestamp: new Date().toISOString(),
+      } as ConversationMessage);
+    }
 
     // Generate a title from the first user message if this is a new conversation
     const conversationTitle = conversationMessages.length === 0 
