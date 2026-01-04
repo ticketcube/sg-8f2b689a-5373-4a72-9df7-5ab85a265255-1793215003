@@ -332,6 +332,7 @@ export default function Home() {
 
   const handleConversationMessage = async (message: string) => {
     console.log("🟢 HANDLE_MESSAGE: Starting to process message");
+    console.log("🟢 HANDLE_MESSAGE: message =", message);
     console.log("🟢 HANDLE_MESSAGE: activeConversation =", activeConversation ? "exists" : "NULL");
     
     if (!activeConversation) {
@@ -365,6 +366,17 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       
       console.log("🟢 API_CALL: Session =", session ? "valid" : "NULL");
+      console.log("🟢 API_CALL: Access token =", session?.access_token ? "exists" : "MISSING");
+      console.log("🟢 API_CALL: Token length =", session?.access_token?.length || 0);
+      
+      const requestBody = {
+        message,
+        conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
+        conversationMessages: activeConversation.messages,
+        mode: "conversation",
+      };
+      
+      console.log("🟢 API_CALL: Request body =", JSON.stringify(requestBody, null, 2));
       console.log("🟢 API_CALL: Sending request to /api/smart-conversation");
 
       const response = await fetch("/api/smart-conversation", {
@@ -373,15 +385,11 @@ export default function Home() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({
-          message,
-          conversationId: activeConversation.id.startsWith("temp-") ? null : activeConversation.id,
-          conversationMessages: activeConversation.messages,
-          mode: "conversation",
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       console.log("🟢 API_RESPONSE: Status =", response.status);
+      console.log("🟢 API_RESPONSE: Status text =", response.statusText);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -390,7 +398,7 @@ export default function Home() {
       }
 
       const data = await response.json();
-      console.log("🟢 API_SUCCESS: Got response from AI");
+      console.log("🟢 API_SUCCESS: Got response from AI", data);
 
       const assistantMessage: Message = {
         role: "assistant",
@@ -420,6 +428,8 @@ export default function Home() {
       }
     } catch (error: any) {
       console.error("🔴 HANDLE_MESSAGE_ERROR:", error);
+      console.error("🔴 HANDLE_MESSAGE_ERROR_STACK:", error.stack);
+      console.error("🔴 HANDLE_MESSAGE_ERROR_MESSAGE:", error.message);
       setError("Sorry, I had trouble processing that. Please try again.");
       setConversationState("waiting");
     }
