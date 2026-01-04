@@ -302,7 +302,17 @@ export default function Home() {
     console.log("🟢 RECORDING_STOP: Stopping speech recognition");
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-      setConversationState("waiting");
+      
+      // Send the captured message to AI if we have one
+      const finalTranscript = currentTranscriptRef.current.trim();
+      if (finalTranscript) {
+        console.log("🟢 SENDING_MESSAGE: Captured transcript =", finalTranscript);
+        handleConversationMessage(finalTranscript);
+        currentTranscriptRef.current = ""; // Clear for next time
+      } else {
+        console.log("🔴 NO_MESSAGE: No transcript captured");
+        setConversationState("waiting");
+      }
     }
   };
 
