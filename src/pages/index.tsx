@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Mic, Volume2, Loader2, Trash2, ShoppingCart, Package, Mail, X, Menu, Plus, MessageSquare, LogOut } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { InventoryTable } from "@/components/InventoryTable";
+import { ShoppingListTable } from "@/components/ShoppingListTable";
 import type { SavedItem, ShoppingListContent, MovingListContent, EmailDraftContent, Conversation, Message } from "@/types";
 import {
   DropdownMenu,
@@ -34,6 +36,8 @@ export default function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [currentInventoryItems, setCurrentInventoryItems] = useState<any[]>([]);
+  const [currentShoppingItems, setCurrentShoppingItems] = useState<any[]>([]);
   
   const recognitionRef = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -222,6 +226,8 @@ export default function Home() {
     setCurrentQuestion("");
     setError("");
     setShowSidebar(false);
+    setCurrentInventoryItems([]);
+    setCurrentShoppingItems([]);
   };
 
   const resumeConversation = async (conversation: Conversation) => {
@@ -253,6 +259,36 @@ export default function Home() {
       }
 
       const data = await response.json();
+
+      // Load items for display if this is a shopping or moving conversation
+      if (conversation.type === "moving" || conversation.type === "shopping") {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const itemsResponse = await fetch("/api/saved-items", {
+            headers: {
+              "Authorization": `Bearer ${session?.access_token}`,
+            },
+          });
+          const itemsData = await itemsResponse.json();
+          
+          if (itemsData.items) {
+            const relevantItem = itemsData.items.find((item: any) => 
+              item.type === (conversation.type === "moving" ? "moving" : "shopping") &&
+              item.metadata?.conversation_id === conversation.id
+            );
+            
+            if (relevantItem && relevantItem.content.items) {
+              if (conversation.type === "moving") {
+                setCurrentInventoryItems(relevantItem.content.items);
+              } else {
+                setCurrentShoppingItems(relevantItem.content.items);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error loading items:", e);
+        }
+      }
 
       const assistantMessage: Message = {
         role: "assistant",
@@ -399,6 +435,15 @@ export default function Home() {
 
       const data = await response.json();
       console.log("🟢 API_SUCCESS: Got response from AI", data);
+
+      // Extract items from function results if present
+      if (data.functionResults) {
+        if (data.conversationType === "moving" && data.functionResults.items) {
+          setCurrentInventoryItems(data.functionResults.items);
+        } else if (data.conversationType === "shopping" && data.functionResults.items) {
+          setCurrentShoppingItems(data.functionResults.items);
+        }
+      }
 
       const assistantMessage: Message = {
         role: "assistant",
@@ -743,6 +788,25 @@ export default function Home() {
                 <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
                   Current: <span className="font-semibold text-purple-600 dark:text-purple-400">{activeConversation.title}</span>
                 </p>
+              </div>
+            )}
+
+            {/* Display inventory or shopping list table */}
+            {activeConversation?.type === "moving" && currentInventoryItems.length > 0 && (
+              <div className="mb-6 w-full max-w-4xl">
+                <h2 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
+                  Your Loft Inventory
+                </h2>
+                <InventoryTable items={currentInventoryItems} />
+              </div>
+            )}
+
+            {activeConversation?.type === "shopping" && currentShoppingItems.length > 0 && (
+              <div className="mb-6 w-full max-w-4xl">
+                <h2 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
+                  Your Shopping List
+                </h2>
+                <ShoppingListTable items={currentShoppingItems} />
               </div>
             )}
 

@@ -815,6 +815,26 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
     console.log("🟦 API_SUCCESS: Sending response to client");
 
+    // Extract latest items for display
+    let functionResults = null;
+    if (conversationType === "moving" || conversationType === "shopping") {
+      try {
+        const { data: latestItem } = await supabase
+          .from("saved_items")
+          .select("*")
+          .eq("type", conversationType === "moving" ? "moving" : "shopping")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (latestItem && latestItem.content.items) {
+          functionResults = { items: latestItem.content.items };
+        }
+      } catch (e) {
+        // No items yet, that's ok
+      }
+    }
+
     return res.status(200).json({
       response: aiResponse,
       conversationType,
@@ -822,6 +842,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       conversationId: resultConversationId,
       title: conversationTitle,
       messages: updatedMessages,
+      functionResults,
     });
 
   } catch (error: any) {
