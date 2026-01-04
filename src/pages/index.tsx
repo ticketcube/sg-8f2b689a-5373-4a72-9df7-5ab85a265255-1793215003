@@ -38,96 +38,111 @@ export default function Home() {
   const recognitionRef = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentTranscriptRef = useRef<string>("");
+  const isRecognitionInitialized = useRef(false);
 
+  // Initialize user session ONCE
   useEffect(() => {
+    console.log("🟢 AUTH_CHECK: Checking user session");
     const getCurrentUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        console.log("🟢 AUTH_CHECK: User authenticated, userId =", session.user.id);
         setCurrentUser(session.user);
         setAccessToken(session.access_token);
+      } else {
+        console.log("🔴 AUTH_CHECK: No user session found");
       }
     };
 
     getCurrentUser();
-  }, []);
+  }, []); // Run ONLY ONCE on mount
 
-  // Check speech recognition support
+  // Load conversations when user is ready
   useEffect(() => {
-    const isSupported = typeof window !== "undefined" && 
-      ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
-    console.log("🟢 SPEECH_CHECK: Speech recognition supported =", isSupported);
-    
-    if (!isSupported) {
-      console.log("🔴 SPEECH_ERROR: Speech recognition not available in this browser");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && currentUser) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = "en-US";
-        recognitionRef.current.maxAlternatives = 1;
-
-        recognitionRef.current.onstart = () => {
-          console.log("🎤 Speech recognition STARTED");
-        };
-
-        recognitionRef.current.onresult = (event: any) => {
-          const resultIndex = event.resultIndex;
-          const result = event.results[resultIndex];
-
-          if (result.isFinal) {
-            const transcript = result[0].transcript;
-            currentTranscriptRef.current = transcript;
-            setCurrentQuestion(transcript);
-          } else {
-            setCurrentQuestion(result[0].transcript);
-          }
-        };
-
-        recognitionRef.current.onerror = (event: any) => {
-          console.error("❌ Speech recognition error:", event.error);
-          
-          let errorMessage = "Sorry, I couldn't hear you clearly. ";
-          
-          switch(event.error) {
-            case "no-speech":
-              errorMessage += "No speech detected. Please try again and speak clearly.";
-              break;
-            case "audio-capture":
-              errorMessage += "Microphone not accessible. Check permissions.";
-              break;
-            case "not-allowed":
-              errorMessage += "Microphone permission denied. Please allow access.";
-              break;
-            case "network":
-              errorMessage += "Network error. Check your connection.";
-              break;
-            default:
-              errorMessage += `Error: ${event.error}`;
-          }
-          
-          setError(errorMessage);
-          setConversationState("waiting");
-        };
-
-        recognitionRef.current.onend = () => {
-          console.log("🛑 Speech recognition ended");
-        };
-      } else {
-        setError("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
-      }
-    }
-
     if (currentUser) {
+      console.log("🟢 DATA_LOAD: Loading conversations for user");
       loadConversations();
     }
+  }, [currentUser]); // Run only when currentUser changes
 
+  // Initialize speech recognition ONCE
+  useEffect(() => {
+    if (typeof window === "undefined" || isRecognitionInitialized.current) {
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.log("🔴 SPEECH_ERROR: Speech recognition not available in this browser");
+      setError("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+
+    console.log("🟢 SPEECH_INIT: Initializing speech recognition");
+    
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      console.log("🎤 SPEECH_EVENT: Recognition started");
+    };
+
+    recognition.onresult = (event: any) => {
+      const resultIndex = event.resultIndex;
+      const result = event.results[resultIndex];
+
+      if (result.isFinal) {
+        const transcript = result[0].transcript;
+        console.log("🟢 SPEECH_RESULT: Final transcript =", transcript);
+        currentTranscriptRef.current = transcript;
+        setCurrentQuestion(transcript);
+      } else {
+        console.log("🟢 SPEECH_RESULT: Interim transcript =", result[0].transcript);
+        setCurrentQuestion(result[0].transcript);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("🔴 SPEECH_ERROR: Recognition error =", event.error);
+      
+      let errorMessage = "Sorry, I couldn't hear you clearly. ";
+      
+      switch(event.error) {
+        case "no-speech":
+          errorMessage += "No speech detected. Please try again and speak clearly.";
+          break;
+        case "audio-capture":
+          errorMessage += "Microphone not accessible. Check permissions.";
+          break;
+        case "not-allowed":
+          errorMessage += "Microphone permission denied. Please allow access.";
+          break;
+        case "network":
+          errorMessage += "Network error. Check your connection.";
+          break;
+        default:
+          errorMessage += `Error: ${event.error}`;
+      }
+      
+      setError(errorMessage);
+      setConversationState("waiting");
+    };
+
+    recognition.onend = () => {
+      console.log("🛑 SPEECH_EVENT: Recognition ended");
+    };
+
+    recognitionRef.current = recognition;
+    isRecognitionInitialized.current = true;
+    console.log("🟢 SPEECH_INIT: Speech recognition initialized successfully");
+
+    // Cleanup on unmount
     return () => {
+      console.log("🟢 CLEANUP: Cleaning up speech recognition");
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
         currentAudioRef.current = null;
@@ -139,11 +154,13 @@ export default function Home() {
           // Ignore if already stopped
         }
       }
+      isRecognitionInitialized.current = false;
     };
-  }, [currentUser]);
+  }, []); // Run ONLY ONCE on mount
 
   const loadConversations = async () => {
     try {
+      console.log("🟢 API_CALL: Loading conversations from database");
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch("/api/conversations", {
         headers: {
@@ -151,9 +168,10 @@ export default function Home() {
         },
       });
       const data = await response.json();
+      console.log("🟢 API_RESPONSE: Loaded", data.conversations?.length || 0, "conversations");
       setConversations(data.conversations || []);
     } catch (error) {
-      console.error("Error loading conversations:", error);
+      console.error("🔴 API_ERROR: Failed to load conversations", error);
     }
   };
 
