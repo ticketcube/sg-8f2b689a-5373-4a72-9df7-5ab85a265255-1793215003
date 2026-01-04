@@ -1,81 +1,116 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getAuthenticatedUser } from "@/lib/supabase-server";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Not authenticated" });
-  }
+  try {
+    const { user, supabase } = await getAuthenticatedUser(req);
+    const userId = user.id;
 
-  const token = authHeader.split(" ")[1];
+    switch (req.method) {
+      case "GET": {
+        // Get all saved items for the authenticated user
+        const { type } = req.query;
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        let query = supabase
+          .from("saved_items")
+          .select("*")
+          .order("updated_at", { ascending: false });
 
-  if (authError || !user) {
-    return res.status(401).json({ error: "Invalid token" });
-  }
+        if (type && typeof type === "string") {
+          query = query.eq("type", type);
+        }
 
-  const userId = user.id;
+        const { data: items, error } = await query;
 
-  if (req.method === "GET") {
-    try {
-      const { data, error } = await supabase
-        .from("saved_items")
-        .select("*")
-        .order("updated_at", { ascending: false });
+        if (error) throw error;
 
-      if (error) throw error;
-      return res.status(200).json({ items: data || [] });
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+        return res.status(200).json({ items: items || [] });
+      }
+
+      case "POST": {
+        // Create a new saved item
+        const { type, title, content, metadata } = req.body;
+
+        if (!type || !content) {
+          return res.status(400).json({ error: "Type and content are required" });
+        }
+
+        const { data: newItem, error } = await supabase
+          .from("saved_items")
+          .insert({
+            user_id: userId,
+            type,
+            title: title || `New ${type}`,
+            content,
+            metadata: metadata || null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return res.status(201).json({ item: newItem });
+      }
+
+      case "PUT": {
+        // Update an existing saved item
+        const { id, title, content, metadata } = req.body;
+
+        if (!id) {
+          return res.status(400).json({ error: "Item ID is required" });
+        }
+
+        const updateData: any = { updated_at: new Date().toISOString() };
+        if (title !== undefined) updateData.title = title;
+        if (content !== undefined) updateData.content = content;
+        if (metadata !== undefined) updateData.metadata = metadata;
+
+        const { data: updatedItem, error } = await supabase
+          .from("saved_items")
+          .update(updateData)
+          .eq("id", id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return res.status(200).json({ item: updatedItem });
+      }
+
+      case "DELETE": {
+        // Delete a saved item
+        const { id } = req.query;
+
+        if (!id || typeof id !== "string") {
+          return res.status(400).json({ error: "Item ID is required" });
+        }
+
+        const { error } = await supabase
+          .from("saved_items")
+          .delete()
+          .eq("id", id);
+
+        if (error) throw error;
+
+        return res.status(200).json({ message: "Item deleted successfully" });
+      }
+
+      default:
+        return res.status(405).json({ error: "Method not allowed" });
     }
-  }
-
-  if (req.method === "POST") {
-    try {
-      const { title, content, type, metadata } = req.body;
-
-      const { data, error } = await supabase
-        .from("saved_items")
-        .insert({
-          title,
-          content,
-          type,
-          metadata: metadata || null,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return res.status(201).json({ item: data });
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+  } catch (error: any) {
+    console.error("API Error:", error);
+    
+    if (error.message === "No authorization header" || error.message === "Invalid or expired token") {
+      return res.status(401).json({ error: "Not authenticated" });
     }
+    
+    return res.status(500).json({
+      error: "Internal server error",
+      details: error.message,
+    });
   }
-
-  if (req.method === "DELETE") {
-    try {
-      const { id } = req.query;
-
-      const { error } = await supabase
-        .from("saved_items")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      return res.status(200).json({ success: true });
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message });
-    }
-  }
-
-  return res.status(405).json({ error: "Method not allowed" });
 }

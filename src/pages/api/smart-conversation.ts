@@ -1,16 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam, ChatCompletionMessage } from "openai/resources/chat/completions";
-import { createClient } from "@supabase/supabase-js";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { getAuthenticatedUser } from "@/lib/supabase-server";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 interface ConversationMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -154,10 +149,11 @@ const tools = [
   }
 ];
 
-// Function execution handlers
+// Function execution handlers - now receives supabase client with user context
 async function executeFunctionCall(
   functionName: string,
   args: any,
+  supabase: any,
   userId: string,
   conversationId?: string
 ): Promise<any> {
@@ -221,6 +217,7 @@ async function executeFunctionCall(
           const { data, error } = await supabase
             .from("saved_items")
             .insert({
+              user_id: userId,
               type: "shopping",
               title: "Shopping List",
               content: { items },
@@ -300,6 +297,7 @@ async function executeFunctionCall(
           const { data, error } = await supabase
             .from("saved_items")
             .insert({
+              user_id: userId,
               type: "moving",
               title: "Moving Inventory",
               content: { items: [newItem] },
@@ -380,6 +378,7 @@ async function executeFunctionCall(
           const { data, error } = await supabase
             .from("saved_items")
             .insert({
+              user_id: userId,
               type: "email",
               title: `Email to ${to}`,
               content: emailContent,
@@ -433,27 +432,12 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Get Supabase token from Authorization header
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.log("🔴 AUTH_ERROR: No authorization header or invalid format");
-    return res.status(401).json({ error: "Not authenticated" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  // Verify token and get user
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-  if (authError || !user) {
-    console.log("🔴 AUTH_ERROR: Invalid token or user not found", authError);
-    return res.status(401).json({ error: "Invalid token" });
-  }
-
-  const userId = user.id;
-  console.log("🟦 AUTH_CHECK: User authenticated, userId =", userId);
-
   try {
+    // Get authenticated user and Supabase client with user context
+    const { user, supabase } = await getAuthenticatedUser(req);
+    const userId = user.id;
+    console.log("🟦 AUTH_CHECK: User authenticated, userId =", userId);
+
     const { message, conversationMessages = [], mode = "conversation", conversationId: incomingConversationId } = req.body;
 
     console.log("🟦 MESSAGE_RECEIVED:", {
@@ -627,6 +611,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
           const functionResult = await executeFunctionCall(
             functionName,
             functionArgs,
+            supabase,
             userId,
             incomingConversationId
           );
@@ -696,7 +681,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
       ? message.slice(0, 50) + (message.length > 50 ? "..." : "")
       : undefined;
 
-    // Save or update conversation in database
+    // Save or update conversation in database - NOW USES USER CONTEXT
     let resultConversationId = incomingConversationId;
     
     try {
@@ -710,8 +695,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
             type: conversationType,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", incomingConversationId)
-          .eq("user_id", userId);
+          .eq("id", incomingConversationId);
 
         if (updateError) throw updateError;
         console.log("🟦 DB_OPERATION: Conversation updated successfully");
@@ -757,7 +741,12 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     });
 
   } catch (error: any) {
-    console.error("🔴 API_ERROR: Unhandled error in smart-conversation", error);
+    console.error("🔴 API_ERROR:", error);
+    
+    if (error.message === "No authorization header" || error.message === "Invalid or expired token") {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    
     return res.status(500).json({
       error: "Failed to process conversation",
       details: error.message,
