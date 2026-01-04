@@ -434,6 +434,9 @@ export default async function handler(
 
   try {
     // Get authenticated user and Supabase client with user context
+    console.log("🟦 AUTH_CHECK: Attempting to get authenticated user");
+    console.log("🟦 AUTH_CHECK: Authorization header present =", !!req.headers.authorization);
+    
     const { user, supabase } = await getAuthenticatedUser(req);
     const userId = user.id;
     console.log("🟦 AUTH_CHECK: User authenticated, userId =", userId);
@@ -742,6 +745,8 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
   } catch (error: any) {
     console.error("🔴 API_ERROR:", error);
+    console.error("🔴 API_ERROR_STACK:", error.stack);
+    console.error("🔴 API_ERROR_MESSAGE:", error.message);
     
     if (error.message === "No authorization header" || error.message === "Invalid or expired token") {
       return res.status(401).json({ error: "Not authenticated" });
