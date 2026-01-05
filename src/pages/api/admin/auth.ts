@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseAuth, isUserAdmin } from '@/lib/supabase-admin';
+import { supabaseAdmin, isUserAdmin } from '@/lib/supabase-admin';
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,7 +10,7 @@ export default async function handler(
 
     if (action === 'login') {
       try {
-        const { data, error } = await supabaseAuth.auth.signInWithPassword({
+        const { data, error } = await supabaseAdmin.auth.signInWithPassword({
           email,
           password,
         });
@@ -21,7 +21,7 @@ export default async function handler(
         const isAdmin = await isUserAdmin(data.user.id);
         
         if (!isAdmin) {
-          await supabaseAuth.auth.signOut();
+          await supabaseAdmin.auth.signOut();
           return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
         }
 
@@ -36,7 +36,7 @@ export default async function handler(
 
     if (action === 'logout') {
       try {
-        await supabaseAuth.auth.signOut();
+        await supabaseAdmin.auth.signOut();
         return res.status(200).json({ success: true });
       } catch (error: any) {
         return res.status(500).json({ error: error.message });
@@ -45,7 +45,7 @@ export default async function handler(
 
     if (action === 'check') {
       try {
-        const { data: { session } } = await supabaseAuth.auth.getSession();
+        const { data: { session } } = await supabaseAdmin.auth.getSession();
         
         if (!session) {
           return res.status(401).json({ authenticated: false });
