@@ -147,6 +147,23 @@ const tools = [
         properties: {}
       }
     }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "web_search",
+      description: "Perform a web search to find information on a topic. Use this when user asks for information that is not in their inventory or shopping list.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "The search query or topic to search for"
+          }
+        },
+        required: ["query"]
+      }
+    }
   }
 ];
 
@@ -437,6 +454,26 @@ async function executeFunctionCall(
         return { 
           success: true, 
           draft: data.content
+        };
+      }
+
+      case "web_search": {
+        const { query } = args;
+
+        console.log("🟦 FUNCTION_EXEC: web_search with query =", query);
+
+        // Simulate a web search
+        const searchResults = [
+          { title: "Result 1", url: "https://example.com/1", snippet: "This is the first result." },
+          { title: "Result 2", url: "https://example.com/2", snippet: "This is the second result." },
+          { title: "Result 3", url: "https://example.com/3", snippet: "This is the third result." },
+        ];
+
+        console.log("🟦 FUNCTION_RESULT: Found", searchResults.length, "results");
+        return { 
+          success: true, 
+          query,
+          results: searchResults
         };
       }
 
