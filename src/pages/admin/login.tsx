@@ -20,8 +20,6 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      console.log('🔐 Attempting login for:', email);
-      
       const response = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -33,21 +31,17 @@ export default function AdminLogin() {
       });
 
       const data = await response.json();
-      console.log('🔐 Login response:', { status: response.status, ok: response.ok, data });
 
       if (!response.ok) {
         throw new Error(data.error || 'Login failed');
       }
 
       // Store session token
-      console.log('✅ Storing token and redirecting to /admin');
       localStorage.setItem('admin_token', data.session.access_token);
       
       // Redirect to admin dashboard
-      await router.push('/admin');
-      console.log('✅ Redirect completed');
+      router.push('/admin');
     } catch (err: any) {
-      console.error('🔴 Login error:', err);
       setError(err.message);
     } finally {
       setLoading(false);

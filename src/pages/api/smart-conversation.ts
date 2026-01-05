@@ -499,34 +499,13 @@ export default async function handler(
   }
 
   try {
-    // Try to get authenticated user, but allow anonymous access if auth fails
-    let userId: string;
-    let supabase: any;
+    // Get authenticated user and Supabase client with user context
+    console.log("🟦 AUTH_CHECK: Attempting to get authenticated user");
+    console.log("🟦 AUTH_CHECK: Authorization header present =", !!req.headers.authorization);
     
-    try {
-      console.log("🟦 AUTH_CHECK: Attempting to get authenticated user");
-      console.log("🟦 AUTH_CHECK: Authorization header present =", !!req.headers.authorization);
-      
-      const authResult = await getAuthenticatedUser(req);
-      userId = authResult.user.id;
-      supabase = authResult.supabase;
-      console.log("🟦 AUTH_CHECK: User authenticated, userId =", userId);
-    } catch (authError: any) {
-      // Authentication failed - use anonymous access
-      console.log("🟦 AUTH_CHECK: Authentication failed, using anonymous access");
-      console.log("🟦 AUTH_CHECK: Error =", authError.message);
-      
-      // Create anonymous Supabase client with anon key
-      const { createClient } = await import("@supabase/supabase-js");
-      supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      
-      // Use a special anonymous user ID (we'll need to handle this differently)
-      userId = "anonymous";
-      console.log("🟦 AUTH_CHECK: Using anonymous user");
-    }
+    const { user, supabase } = await getAuthenticatedUser(req);
+    const userId = user.id;
+    console.log("🟦 AUTH_CHECK: User authenticated, userId =", userId);
 
     const { message, conversationMessages = [], mode = "conversation", conversationId: incomingConversationId } = req.body;
 
@@ -826,61 +805,56 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
     // Save or update conversation in database - NOW USES USER CONTEXT
     let resultConversationId = incomingConversationId;
     
-    // Only save to database if user is authenticated
-    if (userId !== "anonymous") {
-      try {
-        if (incomingConversationId) {
-          console.log("🟦 DB_OPERATION: Updating existing conversation", incomingConversationId);
-          
-          const { error: updateError } = await supabase
-            .from("conversations")
-            .update({
-              messages: updatedMessages,
-              type: conversationType,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", incomingConversationId);
+    try {
+      if (incomingConversationId) {
+        console.log("🟦 DB_OPERATION: Updating existing conversation", incomingConversationId);
+        
+        const { error: updateError } = await supabase
+          .from("conversations")
+          .update({
+            messages: updatedMessages,
+            type: conversationType,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", incomingConversationId);
 
-          if (updateError) throw updateError;
-          console.log("🟦 DB_OPERATION: Conversation updated successfully");
-        } else {
-          console.log("🟦 DB_OPERATION: Creating new conversation");
-          
-          const { data: newConv, error: insertError } = await supabase
-            .from("conversations")
-            .insert({
-              user_id: userId,
-              title: conversationTitle || "New Conversation",
-              messages: updatedMessages,
-              type: conversationType,
-              status: "active",
-            })
-            .select()
-            .single();
+        if (updateError) throw updateError;
+        console.log("🟦 DB_OPERATION: Conversation updated successfully");
+      } else {
+        console.log("🟦 DB_OPERATION: Creating new conversation");
+        
+        const { data: newConv, error: insertError } = await supabase
+          .from("conversations")
+          .insert({
+            user_id: userId,
+            title: conversationTitle || "New Conversation",
+            messages: updatedMessages,
+            type: conversationType,
+            status: "active",
+          })
+          .select()
+          .single();
 
-          if (insertError) throw insertError;
-          
-          if (newConv) {
-            resultConversationId = newConv.id;
-            console.log("🟦 DB_OPERATION: New conversation created, id =", resultConversationId);
-          }
+        if (insertError) throw insertError;
+        
+        if (newConv) {
+          resultConversationId = newConv.id;
+          console.log("🟦 DB_OPERATION: New conversation created, id =", resultConversationId);
         }
-      } catch (dbError) {
-        console.error("🔴 DB_ERROR: Failed to save conversation", dbError);
-        return res.status(500).json({
-          error: "Failed to save conversation to database",
-          details: dbError instanceof Error ? dbError.message : "Unknown error",
-        });
       }
-    } else {
-      console.log("🟦 DB_SKIP: Anonymous user - conversation not saved to database");
+    } catch (dbError) {
+      console.error("🔴 DB_ERROR: Failed to save conversation", dbError);
+      return res.status(500).json({
+        error: "Failed to save conversation to database",
+        details: dbError instanceof Error ? dbError.message : "Unknown error",
+      });
     }
 
     console.log("🟦 API_SUCCESS: Sending response to client");
 
     // Extract latest items for display
     let functionResults = null;
-    if ((conversationType === "moving" || conversationType === "shopping") && userId !== "anonymous") {
+    if (conversationType === "moving" || conversationType === "shopping") {
       try {
         const { data: latestItem } = await supabase
           .from("saved_items")

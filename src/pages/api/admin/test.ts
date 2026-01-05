@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseAdmin, isUserAdmin } from '@/lib/supabase-admin';
+import { supabaseAuth, isUserAdmin, supabaseAdmin } from '@/lib/supabase-admin';
 import OpenAI from 'openai';
 
 async function verifyAdminAuth(req: NextApiRequest): Promise<boolean> {
@@ -8,7 +8,7 @@ async function verifyAdminAuth(req: NextApiRequest): Promise<boolean> {
     if (!authHeader) return false;
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
 
     if (error || !user) return false;
     return await isUserAdmin(user.id);
