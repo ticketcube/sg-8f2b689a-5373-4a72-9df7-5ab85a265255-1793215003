@@ -34,14 +34,18 @@ export interface AdminUser {
 export async function isUserAdmin(userId: string): Promise<boolean> {
   try {
     const { data, error } = await supabaseAdmin
-      .from('admin_users')
-      .select('role')
+      .from('user_profiles')
+      .select('is_admin')
       .eq('user_id', userId)
       .single();
 
-    if (error) return false;
-    return data?.role === 'admin';
-  } catch {
+    if (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+    return data?.is_admin === true;
+  } catch (error) {
+    console.error('Exception checking admin status:', error);
     return false;
   }
 }
