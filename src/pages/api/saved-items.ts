@@ -31,9 +31,34 @@ export default async function handler(
       }
 
       case "POST": {
-        // Create a new saved item
-        const { type, title, content, metadata } = req.body;
+        // Handle different POST actions
+        const { action, conversation_id, type, title, content, metadata } = req.body;
 
+        // Get items by conversation_id from metadata
+        if (action === "get_by_conversation") {
+          if (!conversation_id) {
+            return res.status(400).json({ error: "conversation_id is required" });
+          }
+
+          console.log("🔍 QUERY: Fetching saved_items for conversation_id =", conversation_id);
+
+          // Query using JSONB operator to match metadata->conversation_id
+          const { data: items, error } = await supabase
+            .from("saved_items")
+            .select("*")
+            .contains("metadata", { conversation_id })
+            .order("updated_at", { ascending: false });
+
+          if (error) {
+            console.error("🔴 QUERY_ERROR:", error);
+            throw error;
+          }
+
+          console.log("🟢 QUERY_SUCCESS: Found", items?.length || 0, "items");
+          return res.status(200).json({ items: items || [] });
+        }
+
+        // Create a new saved item
         if (!type || !content) {
           return res.status(400).json({ error: "Type and content are required" });
         }
