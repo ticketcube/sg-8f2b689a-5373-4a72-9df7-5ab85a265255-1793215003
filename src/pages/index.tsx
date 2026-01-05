@@ -236,83 +236,56 @@ export default function Home() {
 
   const resumeConversation = async (conversation: Conversation) => {
     setActiveConversation(conversation);
-    setConversationState("processing");
-    setCurrentQuestion("");
-    setError("");
-    setShowSidebar(false);
+    setMessages(conversation.messages || []);
+    setConversationState("waiting");
+    setIsRecording(false);
+    setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await fetch("/api/smart-conversation", {
+      console.log("🟢 RESUME: Loading conversation", conversation.id);
+
+      // Fetch saved items associated with this conversation
+      const token = localStorage.getItem("session_token");
+      if (!token) {
+        console.log("🔴 RESUME: No auth token found");
+        return;
+      }
+
+      const response = await fetch("/api/saved-items", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          message: "__RESUME_CONVERSATION__",
-          conversationId: conversation.id,
-          conversationMessages: conversation.messages,
-          mode: "conversation",
+          action: "get_by_conversation",
+          conversation_id: conversation.id,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to resume conversation");
-      }
+      if (response.ok) {
+        const data = await response.json();
+        console.log("🟢 RESUME: Fetched saved items", data);
 
-      const data = await response.json();
-
-      // Load items for display if this is a shopping or moving conversation
-      if (conversation.type === "moving" || conversation.type === "shopping") {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          const itemsResponse = await fetch("/api/saved-items", {
-            headers: {
-              "Authorization": `Bearer ${session?.access_token}`,
-            },
-          });
-          const itemsData = await itemsResponse.json();
+        // Display items based on conversation type
+        if (data.items && data.items.length > 0) {
+          const item = data.items[0]; // Get the most recent item for this conversation
           
-          if (itemsData.items) {
-            const relevantItem = itemsData.items.find((item: any) => 
-              item.type === (conversation.type === "moving" ? "moving" : "shopping") &&
-              item.metadata?.conversation_id === conversation.id
-            );
-            
-            if (relevantItem && relevantItem.content.items) {
-              if (conversation.type === "moving") {
-                setCurrentInventoryItems(relevantItem.content.items);
-              } else {
-                setCurrentShoppingItems(relevantItem.content.items);
-              }
-            }
+          if (item.type === "shopping" && item.content.items) {
+            setShoppingList(item.content.items);
+            console.log("🟢 RESUME: Displayed shopping list with", item.content.items.length, "items");
+          } else if (item.type === "moving" && item.content.items) {
+            setInventoryItems(item.content.items);
+            console.log("🟢 RESUME: Displayed inventory with", item.content.items.length, "items");
           }
-        } catch (e) {
-          console.error("Error loading items:", e);
+        } else {
+          console.log("🟢 RESUME: No saved items found for this conversation");
         }
+      } else {
+        console.log("🔴 RESUME: Failed to fetch saved items", response.status);
       }
-
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: data.response,
-        timestamp: new Date(),
-      };
-
-      const updatedConversation = {
-        ...conversation,
-        messages: [...conversation.messages, assistantMessage],
-        updated_at: new Date().toISOString(),
-      };
-
-      setActiveConversation(updatedConversation);
-      await speakAnswer(data.response);
-      setConversationState("waiting");
     } catch (error) {
-      console.error("Error resuming conversation:", error);
-      setError("Failed to resume conversation");
-      setConversationState("waiting");
+      console.error("🔴 RESUME: Error loading conversation data", error);
     }
   };
 
@@ -603,6 +576,56 @@ export default function Home() {
       } catch (error) {
         console.error("Error deleting conversation:", error);
       }
+    }
+  };
+
+  const handleTitleEdit = async (conversationId: string, newTitle: string) => {
+    console.log("🟢 TITLE_EDIT: Attempting to update title for", conversationId, "to", newTitle);
+    
+    try {
+      const token = localStorage.getItem("session_token");
+      if (!token) {
+        console.log("🔴 TITLE_EDIT: No auth token");
+        setError("Not authenticated");
+        return;
+      }
+
+      const response = await fetch("/api/conversations", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          conversationId,
+          title: newTitle,
+        }),
+      });
+
+      if (response.ok) {
+        console.log("🟢 TITLE_EDIT: Title updated successfully");
+        
+        // Update local state
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === conversationId ? { ...conv, title: newTitle } : conv
+          )
+        );
+
+        // Update active conversation if it's the one being edited
+        if (activeConversation?.id === conversationId) {
+          setActiveConversation((prev) =>
+            prev ? { ...prev, title: newTitle } : null
+          );
+        }
+      } else {
+        const errorData = await response.json();
+        console.log("🔴 TITLE_EDIT: Failed to update title", errorData);
+        setError("Failed to update conversation title");
+      }
+    } catch (error) {
+      console.error("🔴 TITLE_EDIT: Error updating title", error);
+      setError("Failed to update conversation title");
     }
   };
 
