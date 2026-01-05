@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mic, Volume2, Loader2, Trash2, ShoppingCart, Package, Mail, X, Menu, Plus, MessageSquare, LogOut } from "lucide-react";
+import { Mic, Volume2, Loader2, Trash2, ShoppingCart, Package, Mail, X, Menu, Plus, MessageSquare, LogOut, Pencil, Check } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { InventoryTable } from "@/components/InventoryTable";
@@ -38,6 +38,8 @@ export default function Home() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [currentInventoryItems, setCurrentInventoryItems] = useState<any[]>([]);
   const [currentShoppingItems, setCurrentShoppingItems] = useState<any[]>([]);
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
   
   const recognitionRef = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -236,26 +238,28 @@ export default function Home() {
 
   const resumeConversation = async (conversation: Conversation) => {
     setActiveConversation(conversation);
-    setMessages(conversation.messages || []);
     setConversationState("waiting");
-    setIsRecording(false);
-    setError(null);
+    setError("");
 
     try {
       console.log("🟢 RESUME: Loading conversation", conversation.id);
 
-      // Fetch saved items associated with this conversation
-      const token = localStorage.getItem("session_token");
-      if (!token) {
+      // Get session for token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
         console.log("🔴 RESUME: No auth token found");
         return;
       }
+
+      // Clear previous items first
+      setCurrentInventoryItems([]);
+      setCurrentShoppingItems([]);
 
       const response = await fetch("/api/saved-items", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           action: "get_by_conversation",
@@ -269,13 +273,15 @@ export default function Home() {
 
         // Display items based on conversation type
         if (data.items && data.items.length > 0) {
-          const item = data.items[0]; // Get the most recent item for this conversation
+          // Find the most relevant item (usually the last updated one)
+          // For now, we take the first one returned
+          const item = data.items[0]; 
           
           if (item.type === "shopping" && item.content.items) {
-            setShoppingList(item.content.items);
+            setCurrentShoppingItems(item.content.items);
             console.log("🟢 RESUME: Displayed shopping list with", item.content.items.length, "items");
           } else if (item.type === "moving" && item.content.items) {
-            setInventoryItems(item.content.items);
+            setCurrentInventoryItems(item.content.items);
             console.log("🟢 RESUME: Displayed inventory with", item.content.items.length, "items");
           }
         } else {
@@ -580,53 +586,52 @@ export default function Home() {
   };
 
   const handleTitleEdit = async (conversationId: string, newTitle: string) => {
-    console.log("🟢 TITLE_EDIT: Attempting to update title for", conversationId, "to", newTitle);
-    
     try {
-      const token = localStorage.getItem("session_token");
-      if (!token) {
-        console.log("🔴 TITLE_EDIT: No auth token");
-        setError("Not authenticated");
-        return;
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
       const response = await fetch("/api/conversations", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          conversationId,
+          id: conversationId,
           title: newTitle,
         }),
       });
 
       if (response.ok) {
-        console.log("🟢 TITLE_EDIT: Title updated successfully");
-        
-        // Update local state
-        setConversations((prev) =>
-          prev.map((conv) =>
-            conv.id === conversationId ? { ...conv, title: newTitle } : conv
-          )
-        );
-
-        // Update active conversation if it's the one being edited
+        setConversations(prev => prev.map(c => 
+          c.id === conversationId ? { ...c, title: newTitle } : c
+        ));
         if (activeConversation?.id === conversationId) {
-          setActiveConversation((prev) =>
-            prev ? { ...prev, title: newTitle } : null
-          );
+          setActiveConversation(prev => prev ? { ...prev, title: newTitle } : null);
         }
-      } else {
-        const errorData = await response.json();
-        console.log("🔴 TITLE_EDIT: Failed to update title", errorData);
-        setError("Failed to update conversation title");
       }
     } catch (error) {
-      console.error("🔴 TITLE_EDIT: Error updating title", error);
-      setError("Failed to update conversation title");
+      console.error("Error updating title:", error);
     }
+  };
+
+  const startEditing = (conv: Conversation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingConversationId(conv.id);
+    setEditTitle(conv.title);
+  };
+
+  const saveTitle = async (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (editTitle.trim()) {
+      await handleTitleEdit(convId, editTitle);
+    }
+    setEditingConversationId(null);
+  };
+
+  const cancelEditing = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingConversationId(null);
   };
 
   const getItemIcon = (type: string) => {
@@ -775,19 +780,56 @@ export default function Home() {
                       <div className="flex items-start justify-between mb-1">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           {getItemIcon(conv.type)}
-                          <h3 className="text-sm font-semibold line-clamp-1">{conv.title}</h3>
+                          
+                          {editingConversationId === conv.id ? (
+                            <div className="flex items-center gap-1 flex-1" onClick={e => e.stopPropagation()}>
+                              <input
+                                type="text"
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                className="flex-1 h-6 text-sm px-1 border rounded"
+                                autoFocus
+                                onClick={e => e.stopPropagation()}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') saveTitle(conv.id, e as any);
+                                  if (e.key === 'Escape') cancelEditing(e as any);
+                                }}
+                              />
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-green-600" onClick={(e) => saveTitle(conv.id, e)}>
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500" onClick={cancelEditing}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <h3 className="text-sm font-semibold line-clamp-1">{conv.title}</h3>
+                          )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteConversation(conv.id);
-                          }}
-                          className="flex-shrink-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        
+                        {!editingConversationId && (
+                          <div className="flex items-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => startEditing(conv, e)}
+                              className="flex-shrink-0 h-8 w-8 p-0"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteConversation(conv.id);
+                              }}
+                              className="flex-shrink-0 h-8 w-8 p-0 text-red-500 hover:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500">
                         {messageCount} messages
