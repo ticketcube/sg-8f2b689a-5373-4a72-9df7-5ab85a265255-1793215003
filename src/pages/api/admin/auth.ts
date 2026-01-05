@@ -72,18 +72,27 @@ export default async function handler(
 
     if (action === 'check') {
       try {
-        const { data: { session } } = await supabaseAuth.auth.getSession();
-        
-        if (!session) {
+        // Get token from Authorization header
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return res.status(401).json({ authenticated: false });
         }
 
-        const isAdmin = await isUserAdmin(session.user.id);
+        const token = authHeader.replace('Bearer ', '');
+        
+        // Verify the token with Supabase
+        const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
+        
+        if (error || !user) {
+          return res.status(401).json({ authenticated: false });
+        }
+
+        const isAdmin = await isUserAdmin(user.id);
         
         return res.status(200).json({
           authenticated: true,
           isAdmin,
-          user: session.user,
+          user,
         });
       } catch (error: any) {
         return res.status(500).json({ error: error.message });

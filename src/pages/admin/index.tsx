@@ -41,12 +41,17 @@ export default function AdminDashboard() {
 
   const checkAuth = async () => {
     try {
+      console.log('🔍 Checking admin authentication...');
       const token = localStorage.getItem('admin_token');
+      console.log('🔍 Token exists:', !!token);
+      
       if (!token) {
+        console.log('🔴 No token found, redirecting to login');
         router.push('/admin/login');
         return;
       }
 
+      console.log('🔍 Validating token with API...');
       const response = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 
@@ -56,18 +61,24 @@ export default function AdminDashboard() {
         body: JSON.stringify({ action: 'check' }),
       });
 
+      console.log('🔍 Auth check response:', { status: response.status, ok: response.ok });
+
       if (!response.ok) {
         throw new Error('Authentication failed');
       }
 
       const data = await response.json();
+      console.log('🔍 Auth check data:', data);
       
       if (!data.authenticated || !data.isAdmin) {
+        console.log('🔴 Not authenticated or not admin, redirecting to login');
         throw new Error('Admin access required');
       }
 
+      console.log('✅ Admin authenticated successfully');
       setAuthenticated(true);
     } catch (error) {
+      console.error('🔴 Auth check failed:', error);
       localStorage.removeItem('admin_token');
       router.push('/admin/login');
     } finally {
