@@ -43,6 +43,8 @@ export default function Home() {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentTranscriptRef = useRef<string>("");
   const isRecognitionInitialized = useRef(false);
+  // NEW: Store interim transcript in ref to avoid re-renders
+  const interimTranscriptRef = useRef<string>("");
 
   // Log ACTUAL mount (only once)
   useEffect(() => {
@@ -108,10 +110,12 @@ export default function Home() {
         const transcript = result[0].transcript;
         console.log("🟢 SPEECH_RESULT: Final transcript =", transcript);
         currentTranscriptRef.current = transcript;
+        // ONLY update state on final result
         setCurrentQuestion(transcript);
       } else {
-        console.log("🟢 SPEECH_RESULT: Interim transcript =", result[0].transcript);
-        setCurrentQuestion(result[0].transcript);
+        // Store interim in ref - NO state update, NO re-render
+        interimTranscriptRef.current = result[0].transcript;
+        console.log("🟢 SPEECH_RESULT: Interim transcript =", result[0].transcript, "(stored in ref, no re-render)");
       }
     };
 
@@ -814,14 +818,7 @@ export default function Home() {
             <div className="flex flex-col items-center gap-4 sm:gap-6 w-full max-w-2xl">
               {renderMainButton()}
 
-              {/* Transcript Display */}
-              {conversationState === "listening" && currentQuestion && (
-                <Card className="p-4 w-full bg-purple-50 dark:bg-purple-900/20 max-h-32 overflow-y-auto">
-                  <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 italic">
-                    "{currentQuestion}"
-                  </p>
-                </Card>
-              )}
+              {/* Transcript Display - REMOVED: Only showed interim results which caused re-renders */}
 
               {/* Stop Speaking Button */}
               {conversationState === "speaking" && (
