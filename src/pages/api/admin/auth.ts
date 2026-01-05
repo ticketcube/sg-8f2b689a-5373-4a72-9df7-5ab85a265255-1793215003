@@ -17,29 +17,46 @@ export default async function handler(
 
     if (action === 'login') {
       try {
-        // Step 1: Authenticate with regular client (anon key supports password auth)
-        const { data, error } = await supabaseAuth.auth.signInWithPassword({
+        console.log('🔐 ADMIN_LOGIN: Starting login for email:', email);
+        
+        // Step 1: Authenticate with regular client
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) throw error;
+        if (error) {
+          console.log('🔴 ADMIN_LOGIN: Auth failed:', error.message);
+          throw error;
+        }
+
+        console.log('✅ ADMIN_LOGIN: Auth successful for user_id:', data.user.id);
 
         // Step 2: Check if user is admin using service role client
+        console.log('🔍 ADMIN_LOGIN: Checking admin status for user_id:', data.user.id);
         const isAdmin = await isUserAdmin(data.user.id);
+        console.log('🔍 ADMIN_LOGIN: isUserAdmin returned:', isAdmin);
         
         if (!isAdmin) {
+          console.log('🔴 ADMIN_LOGIN: User is NOT admin, rejecting access');
           // Sign out the session since they're not admin
-          await supabaseAuth.auth.signOut();
+          await supabase.auth.signOut();
           return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
         }
 
+        console.log('✅ ADMIN_LOGIN: User IS admin, granting access');
         // Step 3: Return session for admin user
         return res.status(200).json({
           user: data.user,
           session: data.session,
         });
       } catch (error: any) {
+        console.log('🔴 ADMIN_LOGIN: Unexpected error:', error);
         return res.status(401).json({ error: error.message });
       }
     }

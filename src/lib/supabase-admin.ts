@@ -27,6 +27,8 @@ export interface AdminUser {
 // Check if user is admin
 export async function isUserAdmin(userId: string): Promise<boolean> {
   try {
+    console.log('🔍 IS_USER_ADMIN: Checking userId:', userId);
+    
     const { data, error } = await supabaseAdmin
       .from('user_profiles')
       .select('is_admin')
@@ -34,12 +36,17 @@ export async function isUserAdmin(userId: string): Promise<boolean> {
       .single();
 
     if (error) {
-      console.error('Error checking admin status:', error);
+      console.error('🔴 IS_USER_ADMIN: Query error:', error);
       return false;
     }
+    
+    console.log('🔍 IS_USER_ADMIN: Query result:', data);
+    console.log('🔍 IS_USER_ADMIN: is_admin value:', data?.is_admin);
+    console.log('🔍 IS_USER_ADMIN: is_admin === true:', data?.is_admin === true);
+    
     return data?.is_admin === true;
   } catch (error) {
-    console.error('Exception checking admin status:', error);
+    console.error('🔴 IS_USER_ADMIN: Exception:', error);
     return false;
   }
 }
