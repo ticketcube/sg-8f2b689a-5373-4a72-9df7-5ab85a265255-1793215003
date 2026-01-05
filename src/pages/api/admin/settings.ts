@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseAuth, isUserAdmin, getSystemSettings, updateSystemSettings } from '@/lib/supabase-admin';
+import { supabaseAdmin, isUserAdmin, getSystemSettings, updateSystemSettings } from '@/lib/supabase-admin';
 
 async function verifyAdminAuth(req: NextApiRequest): Promise<boolean> {
   try {
@@ -7,7 +7,7 @@ async function verifyAdminAuth(req: NextApiRequest): Promise<boolean> {
     if (!authHeader) return false;
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) return false;
     return await isUserAdmin(user.id);
