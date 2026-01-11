@@ -32,6 +32,10 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   
+  // NEW: Text input state for keyboard typing
+  const [textInput, setTextInput] = useState("");
+  const [showTranscript, setShowTranscript] = useState("");
+  
   // Conversation management
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -112,12 +116,15 @@ export default function Home() {
         const transcript = result[0].transcript;
         console.log("🟢 SPEECH_RESULT: Final transcript =", transcript);
         currentTranscriptRef.current = transcript;
-        // ONLY update state on final result
+        // Update final transcript and clear interim
         setCurrentQuestion(transcript);
+        setShowTranscript("");
       } else {
-        // Store interim in ref - NO state update, NO re-render
-        interimTranscriptRef.current = result[0].transcript;
-        console.log("🟢 SPEECH_RESULT: Interim transcript =", result[0].transcript, "(stored in ref, no re-render)");
+        // Store interim in ref AND update display state
+        const interim = result[0].transcript;
+        interimTranscriptRef.current = interim;
+        setShowTranscript(interim);
+        console.log("🟢 SPEECH_RESULT: Interim transcript =", interim);
       }
     };
 
@@ -324,11 +331,37 @@ export default function Home() {
       recognitionRef.current.start();
       setConversationState("listening");
       setCurrentQuestion("");
+      setShowTranscript("");
       setError("");
     } catch (err) {
       console.error("🔴 RECORDING_ERROR:", err);
       setError("Failed to start recording");
     }
+  };
+
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!textInput.trim()) return;
+    
+    // Auto-create conversation if none exists
+    if (!activeConversation) {
+      console.log("🟢 AUTO_CREATE: Creating new conversation for text input");
+      const newConv: Conversation = {
+        id: `temp-${Date.now()}`,
+        title: "New Conversation",
+        messages: [],
+        type: "general" as const,
+        status: "active" as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setActiveConversation(newConv);
+    }
+    
+    const message = textInput.trim();
+    setTextInput("");
+    handleConversationMessage(message);
   };
 
   const stopListening = () => {
@@ -883,7 +916,69 @@ export default function Home() {
             <div className="flex flex-col items-center gap-4 sm:gap-6 w-full max-w-2xl">
               {renderMainButton()}
 
-              {/* Transcript Display - REMOVED: Only showed interim results which caused re-renders */}
+              {/* Real-time Transcript Display */}
+              {conversationState === "listening" && showTranscript && (
+                <Card className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700">
+                  <div className="flex items-start gap-3">
+                    <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-pulse flex-shrink-0 mt-1" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">
+                        You're saying:
+                      </p>
+                      <p className="text-base text-gray-800 dark:text-gray-200">
+                        {showTranscript}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Final Transcript Display */}
+              {conversationState === "processing" && currentQuestion && (
+                <Card className="w-full p-4 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700">
+                  <div className="flex items-start gap-3">
+                    <MessageSquare className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-1" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-1">
+                        You said:
+                      </p>
+                      <p className="text-base text-gray-800 dark:text-gray-200">
+                        {currentQuestion}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Keyboard Input - Show when waiting or idle with active conversation */}
+              {(conversationState === "waiting" || (conversationState === "idle" && activeConversation)) && (
+                <Card className="w-full p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                  <form onSubmit={handleTextSubmit} className="flex flex-col gap-3">
+                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Or type your message:
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={textInput}
+                        onChange={(e) => setTextInput(e.target.value)}
+                        placeholder="Type your message here..."
+                        className="flex-1 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-base"
+                        disabled={conversationState === "processing" || conversationState === "speaking"}
+                      />
+                      <Button
+                        type="submit"
+                        size="lg"
+                        disabled={!textInput.trim() || conversationState === "processing" || conversationState === "speaking"}
+                        className="px-6"
+                      >
+                        Send
+                      </Button>
+                    </div>
+                  </form>
+                </Card>
+              )}
 
               {/* Stop Speaking Button */}
               {conversationState === "speaking" && (
