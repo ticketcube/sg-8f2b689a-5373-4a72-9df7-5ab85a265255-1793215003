@@ -3,10 +3,6 @@ import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { getAuthenticatedUser } from "@/lib/supabase-server";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 interface ConversationMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
@@ -497,6 +493,13 @@ export default async function handler(
     console.log("🔴 API_ERROR: Invalid method =", req.method);
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  // Initialize OpenAI client here to pick up environment variables
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  console.log("🟦 OPENAI_INIT: API key prefix =", process.env.OPENAI_API_KEY?.substring(0, 15) || "NOT_SET");
 
   try {
     // Get authenticated user and Supabase client with user context
