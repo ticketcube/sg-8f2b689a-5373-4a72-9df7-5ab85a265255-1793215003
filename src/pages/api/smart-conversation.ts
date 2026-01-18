@@ -460,8 +460,12 @@ async function executeFunctionCall(
         console.log("🟦 FUNCTION_EXEC: web_search with query =", query);
 
         try {
-          // Call the actual web-search API endpoint
-          const searchResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('supabase.co', 'vercel.app') || 'http://localhost:3000'}/api/web-search`, {
+          // Call the actual web-search API endpoint using relative path
+          const baseUrl = process.env.VERCEL_URL 
+            ? `https://${process.env.VERCEL_URL}` 
+            : 'http://localhost:3000';
+          
+          const searchResponse = await fetch(`${baseUrl}/api/web-search`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -470,7 +474,9 @@ async function executeFunctionCall(
           });
 
           if (!searchResponse.ok) {
-            throw new Error(`Web search failed: ${searchResponse.status}`);
+            const errorData = await searchResponse.json().catch(() => ({}));
+            console.error("🔴 WEB_SEARCH_API_ERROR:", searchResponse.status, errorData);
+            throw new Error(`Web search failed: ${searchResponse.status} - ${errorData.error || 'Unknown error'}`);
           }
 
           const searchData = await searchResponse.json();
