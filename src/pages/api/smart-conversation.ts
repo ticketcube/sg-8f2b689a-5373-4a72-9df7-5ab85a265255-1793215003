@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { getAuthenticatedUser } from "@/lib/supabase-server";
+import { logApiUsage } from "@/lib/api-cost-tracker";
 
 interface ConversationMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -458,19 +459,38 @@ async function executeFunctionCall(
 
         console.log("🟦 FUNCTION_EXEC: web_search with query =", query);
 
-        // Simulate a web search
-        const searchResults = [
-          { title: "Result 1", url: "https://example.com/1", snippet: "This is the first result." },
-          { title: "Result 2", url: "https://example.com/2", snippet: "This is the second result." },
-          { title: "Result 3", url: "https://example.com/3", snippet: "This is the third result." },
-        ];
+        try {
+          // Call the actual web-search API endpoint
+          const searchResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('supabase.co', 'vercel.app') || 'http://localhost:3000'}/api/web-search`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ query, count: 3 }),
+          });
 
-        console.log("🟦 FUNCTION_RESULT: Found", searchResults.length, "results");
-        return { 
-          success: true, 
-          query,
-          results: searchResults
-        };
+          if (!searchResponse.ok) {
+            throw new Error(`Web search failed: ${searchResponse.status}`);
+          }
+
+          const searchData = await searchResponse.json();
+          
+          console.log("🟦 FUNCTION_RESULT: Found", searchData.results?.length || 0, "results", searchData.cached ? "(cached)" : "(live)");
+          
+          return {
+            success: true,
+            query,
+            results: searchData.results || [],
+            cached: searchData.cached || false,
+          };
+        } catch (error: any) {
+          console.error("🔴 WEB_SEARCH_ERROR:", error);
+          return {
+            success: false,
+            error: error.message,
+            query,
+          };
+        }
       }
 
       default:
@@ -845,6 +865,42 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
           console.log("🟦 DB_OPERATION: New conversation created, id =", resultConversationId);
         }
       }
+
+      // Log API usage for this conversation (when conversation is saved/updated)
+      console.log("📊 LOGGING API USAGE");
+      
+      // Log OpenAI usage
+      const tokensUsed = completion.usage;
+      if (tokensUsed) {
+        await logApiUsage({
+          userId,
+          apiName: "openai",
+          endpoint: "/api/smart-conversation",
+          model: "gpt-3.5-turbo",
+          tokensInput: tokensUsed.prompt_tokens,
+          tokensOutput: tokensUsed.completion_tokens,
+          tokensTotal: tokensUsed.total_tokens,
+          requestData: {
+            conversation_id: resultConversationId,
+            conversation_type: conversationType,
+          },
+        });
+      }
+
+      // Log web search usage if web_search was called
+      const webSearchCalls = toolCalls?.filter((tc: any) => tc.function?.name === "web_search").length || 0;
+      if (webSearchCalls > 0) {
+        await logApiUsage({
+          userId,
+          apiName: "brave_search",
+          endpoint: "/api/web-search",
+          apiCalls: webSearchCalls,
+          requestData: {
+            conversation_id: resultConversationId,
+          },
+        });
+      }
+
     } catch (dbError) {
       console.error("🔴 DB_ERROR: Failed to save conversation", dbError);
       return res.status(500).json({

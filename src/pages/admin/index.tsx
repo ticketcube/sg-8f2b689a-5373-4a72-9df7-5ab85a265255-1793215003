@@ -15,8 +15,11 @@ import {
   XCircle, 
   Loader2,
   LogOut,
-  AlertCircle
+  AlertCircle,
+  Activity
 } from 'lucide-react';
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ApiCostsTable } from "@/components/ApiCostsTable";
 
 interface TestResult {
   success: boolean;
@@ -152,17 +155,17 @@ export default function AdminDashboard() {
 
         <Tabs defaultValue="diagnostics" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="diagnostics">
-              <TestTube className="h-4 w-4 mr-2" />
+            <TabsTrigger value="diagnostics" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
               Diagnostics
             </TabsTrigger>
-            <TabsTrigger value="settings">
-              <Settings className="h-4 w-4 mr-2" />
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
               Settings
             </TabsTrigger>
-            <TabsTrigger value="database">
-              <Database className="h-4 w-4 mr-2" />
-              Database
+            <TabsTrigger value="api-costs" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              API Costs & Usage
             </TabsTrigger>
           </TabsList>
 
@@ -463,76 +466,15 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="database" className="space-y-6">
-            <Card className="p-6">
-              <h2 className="text-2xl font-bold mb-6">Database Setup</h2>
-              
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                    Required Tables
-                  </h3>
-                  <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-                    Run these SQL commands in your Supabase SQL editor to set up the admin system:
-                  </p>
-                  <div className="bg-gray-900 p-4 rounded text-xs font-mono text-gray-100 overflow-x-auto">
-                    <pre>{`-- Create admin users table
-CREATE TABLE IF NOT EXISTS admin_users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id)
-);
+          <TabsContent value="api-costs" className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">API Costs & Usage</h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                Monitor API usage and costs across all users and services
+              </p>
+            </div>
 
--- Create system settings table
-CREATE TABLE IF NOT EXISTS system_settings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  openai_api_key TEXT,
-  openai_model TEXT DEFAULT 'gpt-3.5-turbo',
-  system_prompt TEXT,
-  enable_ai BOOLEAN DEFAULT true,
-  max_conversation_length INTEGER DEFAULT 20,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Enable RLS
-ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
-
--- Create policies
-CREATE POLICY "Admin users can view all admin_users"
-  ON admin_users FOR SELECT
-  TO authenticated
-  USING (auth.uid() IN (SELECT user_id FROM admin_users WHERE role = 'admin'));
-
-CREATE POLICY "System settings readable by admins"
-  ON system_settings FOR ALL
-  TO authenticated
-  USING (auth.uid() IN (SELECT user_id FROM admin_users WHERE role = 'admin'));`}</pre>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                  <h3 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">
-                    Create Your First Admin User
-                  </h3>
-                  <p className="text-sm text-purple-700 dark:text-purple-300 mb-4">
-                    After creating an account in Supabase Auth, run this to make yourself an admin:
-                  </p>
-                  <div className="bg-gray-900 p-4 rounded text-xs font-mono text-gray-100 overflow-x-auto">
-                    <pre>{`-- Replace YOUR_EMAIL with your actual email
-INSERT INTO admin_users (user_id, email, role)
-SELECT id, email, 'admin'
-FROM auth.users
-WHERE email = 'YOUR_EMAIL'
-ON CONFLICT (user_id) DO UPDATE SET role = 'admin';`}</pre>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <ApiCostsTable />
           </TabsContent>
         </Tabs>
       </div>

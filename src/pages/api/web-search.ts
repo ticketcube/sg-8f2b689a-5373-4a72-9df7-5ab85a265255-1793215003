@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { createClient } from "@supabase/supabase-js";
 
 interface BraveSearchResult {
   title: string;
@@ -11,6 +12,7 @@ interface BraveSearchResponse {
   query: string;
   results: BraveSearchResult[];
   total_results: number;
+  cached?: boolean;
 }
 
 export default async function handler(
@@ -22,11 +24,55 @@ export default async function handler(
   }
 
   try {
-    const { query, count = 5 } = req.body;
+    const { query, count = 3 } = req.body;
 
     if (!query) {
       return res.status(400).json({ error: "Query is required" });
     }
+
+    // Initialize Supabase admin client for cache access
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    // Check cache first
+    console.log("🔍 CACHE_CHECK: Looking for cached results for:", query);
+    const { data: cachedResult, error: cacheError } = await supabaseAdmin
+      .from("search_cache")
+      .select("*")
+      .eq("query", query.toLowerCase().trim())
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (cachedResult && !cacheError) {
+      console.log("✅ CACHE_HIT: Returning cached results");
+      
+      // Increment hit count
+      await supabaseAdmin
+        .from("search_cache")
+        .update({ hit_count: cachedResult.hit_count + 1 })
+        .eq("id", cachedResult.id);
+
+      const results = cachedResult.results as BraveSearchResult[];
+      
+      return res.status(200).json({
+        query,
+        results: results.slice(0, count),
+        total_results: results.length,
+        cached: true,
+      });
+    }
+
+    console.log("❌ CACHE_MISS: Calling Brave Search API");
 
     const apiKey = process.env.BRAVE_SEARCH_API_KEY;
 
@@ -68,10 +114,19 @@ export default async function handler(
       age: result.age,
     }));
 
+    // Cache the results for 7 days
+    console.log("💾 CACHE_SAVE: Storing results in cache");
+    await supabaseAdmin.from("search_cache").insert({
+      query: query.toLowerCase().trim(),
+      results,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+    });
+
     const response: BraveSearchResponse = {
       query,
       results,
       total_results: results.length,
+      cached: false,
     };
 
     return res.status(200).json(response);
