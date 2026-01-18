@@ -93,7 +93,7 @@ export default async function handler(
     if (test === 'database-tables') {
       try {
         // Check which tables exist
-        const tables = ['conversations', 'system_settings', 'admin_users'];
+        const tables = ['conversations', 'system_settings', 'user_profiles'];
         const results: Record<string, boolean> = {};
 
         for (const table of tables) {

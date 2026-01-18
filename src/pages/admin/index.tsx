@@ -378,22 +378,56 @@ export default function AdminDashboard() {
               <h2 className="text-2xl font-bold mb-6">System Settings</h2>
               
               <div className="space-y-6">
-                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                    <div>
-                      <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
-                        Current Issue Detected
-                      </h3>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-2">
-                        Your OpenAI API key appears to be invalid or expired. Please update it in your environment variables.
-                      </p>
-                      <p className="text-xs text-yellow-600 dark:text-yellow-400 font-mono bg-yellow-100 dark:bg-yellow-900/40 p-2 rounded">
-                        Current key: {process.env.OPENAI_API_KEY?.slice(0, 20)}...
-                      </p>
+                {testResults.openai && !testResults.openai.success && (
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                      <div>
+                        <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                          OpenAI API Issue Detected
+                        </h3>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-2">
+                          {testResults.openai.error}: {testResults.openai.details}
+                        </p>
+                        <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                          Please update your OpenAI API key in the .env.local file and restart the server.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {testResults.openai && testResults.openai.success && (
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                      <div>
+                        <h3 className="font-semibold text-green-800 dark:text-green-200 mb-1">
+                          OpenAI API Connected
+                        </h3>
+                        <p className="text-sm text-green-700 dark:text-green-300 mb-2">
+                          ✓ {testResults.openai.response}
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-400">
+                          Model: {testResults.openai.model}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!testResults.openai && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          Run the OpenAI diagnostic test to check your API key status.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <div>
