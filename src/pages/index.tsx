@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mic, Volume2, Loader2, Trash2, ShoppingCart, Package, Mail, X, Menu, Plus, MessageSquare, LogOut, Pencil, Check } from "lucide-react";
+import { Mic, Volume2, Loader2, Trash2, ShoppingCart, Package, Mail, X, Menu, Plus, MessageSquare, LogOut, Pencil, Check, VolumeX, Volume2 as VolumeIcon } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { InventoryTable } from "@/components/InventoryTable";
@@ -36,6 +36,11 @@ export default function Home() {
   const [textInput, setTextInput] = useState("");
   const [showTranscript, setShowTranscript] = useState("");
   
+  // NEW: TTS toggle state
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
+  const [displayedResponse, setDisplayedResponse] = useState("");
+  
   // Conversation management
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -49,8 +54,59 @@ export default function Home() {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentTranscriptRef = useRef<string>("");
   const isRecognitionInitialized = useRef(false);
-  // NEW: Store interim transcript in ref to avoid re-renders
   const interimTranscriptRef = useRef<string>("");
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load TTS preference from localStorage
+  useEffect(() => {
+    const savedTtsPreference = localStorage.getItem('tts_enabled');
+    if (savedTtsPreference !== null) {
+      setTtsEnabled(savedTtsPreference === 'true');
+    }
+  }, []);
+
+  // Save TTS preference to localStorage
+  const toggleTts = () => {
+    const newValue = !ttsEnabled;
+    setTtsEnabled(newValue);
+    localStorage.setItem('tts_enabled', String(newValue));
+    
+    // If turning off while speaking, stop current audio
+    if (!newValue && currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setConversationState("waiting");
+    }
+  };
+
+  // Typing animation function
+  const typeResponse = (text: string, callback?: () => void) => {
+    setIsTyping(true);
+    setDisplayedResponse("");
+    let index = 0;
+    
+    const typeChar = () => {
+      if (index < text.length) {
+        setDisplayedResponse(text.substring(0, index + 1));
+        index++;
+        typingTimeoutRef.current = setTimeout(typeChar, 30); // 30ms per character (fast)
+      } else {
+        setIsTyping(false);
+        if (callback) callback();
+      }
+    };
+    
+    typeChar();
+  };
+
+  // Cleanup typing animation on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Log ACTUAL mount (only once)
   useEffect(() => {
@@ -396,6 +452,7 @@ export default function Home() {
 
     console.log("🟢 HANDLE_MESSAGE: Setting state to processing");
     setConversationState("processing");
+    setDisplayedResponse(""); // Clear previous response
 
     try {
       console.log("🟢 HANDLE_MESSAGE: Creating user message");
@@ -482,8 +539,20 @@ export default function Home() {
       await loadConversations();
 
       if (data.response) {
-        console.log("🟢 TTS: Starting to speak response");
-        await speakAnswer(data.response);
+        console.log("🟢 RESPONSE: Starting typing animation and TTS");
+        
+        // Start typing animation
+        typeResponse(data.response, () => {
+          console.log("🟢 TYPING: Animation complete");
+        });
+        
+        // Start TTS if enabled
+        if (ttsEnabled) {
+          setConversationState("speaking");
+          await speakAnswer(data.response);
+        } else {
+          setConversationState("waiting");
+        }
       } else {
         setConversationState("waiting");
       }
@@ -685,15 +754,44 @@ export default function Home() {
     switch (conversationState) {
       case "idle":
         return (
-          <button
-            onClick={startListening}
-            className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-2xl transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-500"
-          >
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-2xl sm:text-3xl md:text-4xl font-bold">START</span>
-              <span className="text-2xl sm:text-3xl md:text-4xl font-bold">TALKING</span>
-            </div>
-          </button>
+          <div className="flex flex-col items-center gap-6">
+            <button
+              onClick={startListening}
+              className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-2xl transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-500"
+            >
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-2xl sm:text-3xl md:text-4xl font-bold">START</span>
+                <span className="text-2xl sm:text-3xl md:text-4xl font-bold">TALKING</span>
+              </div>
+            </button>
+            
+            {/* Text Input Box - Initial Screen */}
+            <Card className="w-full max-w-2xl p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+              <form onSubmit={handleTextSubmit} className="flex flex-col gap-3">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Or type your message:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    placeholder="Type your message here..."
+                    className="flex-1 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-base"
+                  />
+                  <Button
+                    type="submit"
+                    size="lg"
+                    disabled={!textInput.trim()}
+                    className="px-6"
+                  >
+                    Send
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
         );
 
       case "listening":
@@ -755,6 +853,22 @@ export default function Home() {
           </div>
           
           <div className="flex items-center gap-2">
+            {/* TTS Toggle Button - Shows after first conversation */}
+            {activeConversation && activeConversation.messages.length > 0 && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleTts}
+                className="relative"
+                title={ttsEnabled ? "Turn off voice" : "Turn on voice"}
+              >
+                {ttsEnabled ? (
+                  <VolumeIcon className="h-5 w-5 text-green-600" />
+                ) : (
+                  <VolumeX className="h-5 w-5 text-gray-400" />
+                )}
+              </Button>
+            )}
             <HelpModal />
             <ThemeSwitch />
             <DropdownMenu>
@@ -916,17 +1030,18 @@ export default function Home() {
             <div className="flex flex-col items-center gap-4 sm:gap-6 w-full max-w-2xl">
               {renderMainButton()}
 
-              {/* Real-time Transcript Display */}
-              {conversationState === "listening" && showTranscript && (
-                <Card className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700">
+              {/* Typing Response Display */}
+              {(conversationState === "speaking" || conversationState === "waiting" || isTyping) && displayedResponse && (
+                <Card className="w-full p-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700">
                   <div className="flex items-start gap-3">
-                    <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-pulse flex-shrink-0 mt-1" />
+                    <Volume2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-1" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">
-                        You're saying:
+                      <p className="text-sm font-semibold text-green-800 dark:text-green-300 mb-1">
+                        Assistant:
                       </p>
                       <p className="text-base text-gray-800 dark:text-gray-200">
-                        {showTranscript}
+                        {displayedResponse}
+                        {isTyping && <span className="animate-pulse">▋</span>}
                       </p>
                     </div>
                   </div>

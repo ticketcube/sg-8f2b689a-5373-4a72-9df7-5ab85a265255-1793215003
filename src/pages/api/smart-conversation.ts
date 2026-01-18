@@ -604,12 +604,24 @@ CONVERSATION TYPES & WHEN TO USE FUNCTIONS:
    - Example: "lamp on floor 5 going to Sarah in Boston"
 3. EMAIL DRAFTS - Use save_email_draft() when user is composing an email
 4. GENERAL Q&A - Answer questions conversationally
+5. REAL-TIME INFORMATION - Use web_search() for current information
+
+WHEN TO USE WEB SEARCH:
+- Weather queries (temperature, forecast, conditions)
+- Current news and events
+- Sports scores and schedules
+- Stock prices and financial data
+- Business hours and locations
+- Any real-time or current information you don't have
+- Facts you're uncertain about
+- Recent events after your knowledge cutoff
 
 FUNCTION CALLING RULES:
 - Call functions proactively as user mentions items/actions
 - Use get_inventory() when user asks "what's on my list", "who is X going to", "show me my items"
 - Always confirm what you saved after calling a function
 - Be natural - don't announce "I'm calling a function now"
+- For weather/news/real-time queries, ALWAYS use web_search() first, then provide the answer
 
 INVENTORY QUERIES:
 - "What's on my list?" → Use get_inventory() with no filter
@@ -632,6 +644,7 @@ IMPORTANT:
 - Proactively save items using functions
 - Don't just talk about saving - actually save using functions
 - Be concise but friendly
+- For real-time information, use web_search() and provide the answer naturally
 
 CONVERSATION CONTEXT:
 ${conversationMessages.length > 0 ? "Continue this conversation naturally. Review previous messages for context." : "This is the start of a new conversation."}`;
