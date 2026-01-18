@@ -1,4 +1,3 @@
- 
 export type Json =
   | string
   | number
@@ -13,8 +12,81 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          setting_key: string
+          setting_value: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      admin_users: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          role?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       artist_demo_requests: {
         Row: {
           created_at: string | null
@@ -120,6 +192,74 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      course_tees: {
+        Row: {
+          color: string
+          course_id: string | null
+          course_rating: number
+          created_at: string | null
+          id: string
+          name: string
+          slope_rating: number
+          updated_at: string | null
+        }
+        Insert: {
+          color: string
+          course_id?: string | null
+          course_rating: number
+          created_at?: string | null
+          id?: string
+          name: string
+          slope_rating: number
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string
+          course_id?: string | null
+          course_rating?: number
+          created_at?: string | null
+          id?: string
+          name?: string
+          slope_rating?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_tees_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          created_at: string | null
+          holes: number
+          id: string
+          name: string
+          par: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          holes: number
+          id?: string
+          name: string
+          par: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          holes?: number
+          id?: string
+          name?: string
+          par?: number
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -308,6 +448,47 @@ export type Database = {
           },
         ]
       }
+      daily_prizes: {
+        Row: {
+          created_at: string | null
+          date: string | null
+          game_id: string | null
+          id: string
+          paid: boolean | null
+          prize_amount: number | null
+          rank: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string | null
+          game_id?: string | null
+          id?: string
+          paid?: boolean | null
+          prize_amount?: number | null
+          rank?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string | null
+          game_id?: string | null
+          id?: string
+          paid?: boolean | null
+          prize_amount?: number | null
+          rank?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_prizes_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fandragon_waitlist: {
         Row: {
           created_at: string | null
@@ -335,6 +516,228 @@ export type Database = {
           primary_interest?: string | null
           social_handle?: string | null
           user_type?: string
+        }
+        Relationships: []
+      }
+      game_scores: {
+        Row: {
+          created_at: string | null
+          game_data: Json | null
+          id: string
+          score: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          game_data?: Json | null
+          id?: string
+          score: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          game_data?: Json | null
+          id?: string
+          score?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gamepool_entries: {
+        Row: {
+          created_at: string | null
+          gamepool_id: string | null
+          id: string
+          quantity: number | null
+          stripe_checkout_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          gamepool_id?: string | null
+          id?: string
+          quantity?: number | null
+          stripe_checkout_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          gamepool_id?: string | null
+          id?: string
+          quantity?: number | null
+          stripe_checkout_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gamepool_entries_gamepool_id_fkey"
+            columns: ["gamepool_id"]
+            isOneToOne: false
+            referencedRelation: "gamepools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gamepools: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          current_players: number | null
+          end_date: string | null
+          entry_fee_points: number
+          id: string
+          max_players: number | null
+          min_players: number | null
+          name: string
+          prize_pool_percentage: number | null
+          start_date: string | null
+          status: string
+          total_prize_pool: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          current_players?: number | null
+          end_date?: string | null
+          entry_fee_points: number
+          id?: string
+          max_players?: number | null
+          min_players?: number | null
+          name: string
+          prize_pool_percentage?: number | null
+          start_date?: string | null
+          status: string
+          total_prize_pool?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          current_players?: number | null
+          end_date?: string | null
+          entry_fee_points?: number
+          id?: string
+          max_players?: number | null
+          min_players?: number | null
+          name?: string
+          prize_pool_percentage?: number | null
+          start_date?: string | null
+          status?: string
+          total_prize_pool?: number | null
+        }
+        Relationships: []
+      }
+      games: {
+        Row: {
+          adjusted_average_score: number | null
+          course_id: string | null
+          course_name: string
+          created_at: string | null
+          four_points_earned: number
+          game_type: number | null
+          ghin_handicap: number | null
+          hole_categories: Json | null
+          hole_scores: Json
+          id: string
+          leaderboard_type: string | null
+          paid_entry: boolean | null
+          player_name: string
+          target_score: number
+          tee_id: string | null
+          tee_name: string
+          total_points: number
+          user_id: string | null
+          user_type: string | null
+          validated: boolean | null
+        }
+        Insert: {
+          adjusted_average_score?: number | null
+          course_id?: string | null
+          course_name: string
+          created_at?: string | null
+          four_points_earned: number
+          game_type?: number | null
+          ghin_handicap?: number | null
+          hole_categories?: Json | null
+          hole_scores: Json
+          id?: string
+          leaderboard_type?: string | null
+          paid_entry?: boolean | null
+          player_name: string
+          target_score: number
+          tee_id?: string | null
+          tee_name: string
+          total_points: number
+          user_id?: string | null
+          user_type?: string | null
+          validated?: boolean | null
+        }
+        Update: {
+          adjusted_average_score?: number | null
+          course_id?: string | null
+          course_name?: string
+          created_at?: string | null
+          four_points_earned?: number
+          game_type?: number | null
+          ghin_handicap?: number | null
+          hole_categories?: Json | null
+          hole_scores?: Json
+          id?: string
+          leaderboard_type?: string | null
+          paid_entry?: boolean | null
+          player_name?: string
+          target_score?: number
+          tee_id?: string | null
+          tee_name?: string
+          total_points?: number
+          user_id?: string | null
+          user_type?: string | null
+          validated?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "games_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "games_tee_id_fkey"
+            columns: ["tee_id"]
+            isOneToOne: false
+            referencedRelation: "course_tees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "games_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guest_users: {
+        Row: {
+          created_at: string | null
+          games_played: number | null
+          golfer_name: string
+          id: string
+          last_used: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          games_played?: number | null
+          golfer_name: string
+          id?: string
+          last_used?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          games_played?: number | null
+          golfer_name?: string
+          id?: string
+          last_used?: string | null
         }
         Relationships: []
       }
@@ -462,6 +865,42 @@ export type Database = {
           },
         ]
       }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          points_awarded: number | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_payment_intent_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          points_awarded?: number | null
+          status: string
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          points_awarded?: number | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       pending_artist_templates: {
         Row: {
           artist_name: string
@@ -564,29 +1003,65 @@ export type Database = {
         }
         Relationships: []
       }
+      points_ledger: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          id: string
+          reference_id: string | null
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string | null
+          display_name: string | null
           email: string | null
           full_name: string | null
           id: string
+          member_cat: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
+          display_name?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          member_cat?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
+          display_name?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          member_cat?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -621,6 +1096,117 @@ export type Database = {
           type?: string
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      stripe_prices: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          member_cat: string
+          price_id: string
+          product_name: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          member_cat: string
+          price_id: string
+          product_name: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          member_cat?: string
+          price_id?: string
+          product_name?: string
+        }
+        Relationships: []
+      }
+      survey_responses: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          drop_off_step: number | null
+          id: string
+          ip_address: unknown
+          question_1_answer: string | null
+          question_2_answer: string | null
+          question_3_answer: string | null
+          session_id: string
+          started_at: string | null
+          updated_at: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          drop_off_step?: number | null
+          id?: string
+          ip_address?: unknown
+          question_1_answer?: string | null
+          question_2_answer?: string | null
+          question_3_answer?: string | null
+          session_id: string
+          started_at?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          drop_off_step?: number | null
+          id?: string
+          ip_address?: unknown
+          question_1_answer?: string | null
+          question_2_answer?: string | null
+          question_3_answer?: string | null
+          session_id?: string
+          started_at?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      system_settings: {
+        Row: {
+          created_at: string | null
+          enable_ai: boolean | null
+          id: string
+          max_conversation_length: number | null
+          openai_api_key: string | null
+          openai_model: string | null
+          system_prompt: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enable_ai?: boolean | null
+          id?: string
+          max_conversation_length?: number | null
+          openai_api_key?: string | null
+          openai_model?: string | null
+          system_prompt?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enable_ai?: boolean | null
+          id?: string
+          max_conversation_length?: number | null
+          openai_api_key?: string | null
+          openai_model?: string | null
+          system_prompt?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -816,6 +1402,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_points: {
+        Row: {
+          id: string
+          total_points: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          total_points?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          total_points?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           avatar_url: string | null
@@ -870,6 +1477,38 @@ export type Database = {
         }
         Relationships: []
       }
+      waitlist: {
+        Row: {
+          avail_1: string
+          avail_2: string | null
+          avail_3: string | null
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          avail_1: string
+          avail_2?: string | null
+          avail_3?: string | null
+          created_at?: string | null
+          id: string
+        }
+        Update: {
+          avail_1?: string
+          avail_2?: string | null
+          avail_3?: string | null
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_profile_fk"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -892,6 +1531,10 @@ export type Database = {
       }
       generate_api_key: { Args: never; Returns: string }
       generate_api_secret: { Args: never; Returns: string }
+      increment_current_players: {
+        Args: { pool_id: string; qty: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -1020,6 +1663,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
