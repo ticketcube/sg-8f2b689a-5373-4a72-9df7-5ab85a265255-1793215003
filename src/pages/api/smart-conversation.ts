@@ -710,6 +710,9 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
     console.log("🟦 OPENAI_RESPONSE: Tool calls =", toolCalls?.length || 0);
 
+    // Store tool results to avoid re-execution
+    const toolResults: Array<{ toolCallId: string; functionName: string; result: any }> = [];
+
     // Handle function calls
     if (toolCalls && toolCalls.length > 0) {
       console.log("🟦 FUNCTION_EXECUTION: Processing", toolCalls.length, "function calls");
@@ -723,7 +726,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
         }
       ];
 
-      // Execute each function call
+      // Execute each function call ONCE
       for (const toolCall of toolCalls) {
         if (toolCall.type === "function") {
           const functionName = toolCall.function.name;
@@ -741,7 +744,14 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
           console.log("🟦 FUNCTION_RESULT:", functionName, "=>", functionResult);
 
-          // Add function result to messages
+          // Store result for later use
+          toolResults.push({
+            toolCallId: toolCall.id,
+            functionName,
+            result: functionResult
+          });
+
+          // Add function result to messages for OpenAI
           functionMessages.push({
             role: "tool",
             tool_call_id: toolCall.id,
@@ -802,26 +812,14 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
         tool_calls: toolCalls,
       } as ConversationMessage);
 
-      // Add tool response messages
-      for (const toolCall of toolCalls) {
-        if (toolCall.type === "function") {
-          const functionName = toolCall.function.name;
-          const functionArgs = JSON.parse(toolCall.function.arguments);
-          const functionResult = await executeFunctionCall(
-            functionName,
-            functionArgs,
-            supabase,
-            userId,
-            incomingConversationId
-          );
-
-          updatedMessages.push({
-            role: "tool",
-            content: JSON.stringify(functionResult),
-            tool_call_id: toolCall.id,
-            timestamp: new Date().toISOString(),
-          } as ConversationMessage);
-        }
+      // Add tool response messages using stored results
+      for (const toolResult of toolResults) {
+        updatedMessages.push({
+          role: "tool",
+          content: JSON.stringify(toolResult.result),
+          tool_call_id: toolResult.toolCallId,
+          timestamp: new Date().toISOString(),
+        } as ConversationMessage);
       }
 
       // Add final assistant response
