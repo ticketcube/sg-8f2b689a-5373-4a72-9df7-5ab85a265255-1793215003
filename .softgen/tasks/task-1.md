@@ -1,6 +1,6 @@
 ---
 title: Mobile Mind Map Page
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags: [mindmap, mobile, touch]
@@ -13,14 +13,14 @@ position: 1
 Build a mobile-centric touch-based mind map application as a new page. Focus on intuitive touch interactions optimized for mobile devices with gesture support for creating, editing, and organizing mind map nodes.
 
 ## Checklist
-- [ ] Create mind map page at /mindmap route
-- [ ] Implement touch-based canvas with pan and pinch-to-zoom
-- [ ] Add node creation on tap, drag to move nodes
-- [ ] Create connection lines between nodes
-- [ ] Add node editing with double-tap or long-press
-- [ ] Implement Supabase schema for mind maps storage
-- [ ] Build mobile-optimized toolbar with essential controls
-- [ ] Add save/load functionality with Supabase
+- [x] Create mind map page at /mindmap route
+- [x] Implement touch-based canvas with pan and pinch-to-zoom
+- [x] Add node creation on tap, drag to move nodes
+- [x] Create connection lines between nodes
+- [x] Add node editing with double-tap or long-press
+- [x] Implement Supabase schema for mind maps storage
+- [x] Build mobile-optimized toolbar with essential controls
+- [x] Add save/load functionality with Supabase
 
 ## Acceptance
 - User can create and arrange mind map nodes using only touch gestures
