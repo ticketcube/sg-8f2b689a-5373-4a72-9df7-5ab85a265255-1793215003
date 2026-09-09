@@ -14,6 +14,42 @@ interface PacingInput {
 }
 
 /**
+ * Calculate current sales velocity (tickets per day)
+ */
+export function calculateSalesVelocity(
+  currentTicketsSold: number,
+  daysElapsed: number
+): number {
+  if (daysElapsed <= 0) return 0;
+  return currentTicketsSold / daysElapsed;
+}
+
+/**
+ * Calculate required daily sales to hit target
+ */
+export function calculateRequiredDailySales(
+  ticketsRemaining: number,
+  daysToEvent: number
+): number {
+  if (daysToEvent <= 0) return 0;
+  return ticketsRemaining / daysToEvent;
+}
+
+/**
+ * Calculate projected final ticket sales
+ */
+export function calculateProjectedFinalSales(
+  currentTicketsSold: number,
+  currentVelocity: number,
+  expectedOrganicSalesPerDay: number,
+  daysToEvent: number
+): number {
+  // Use the higher of current velocity or expected organic
+  const effectiveVelocity = Math.max(currentVelocity, expectedOrganicSalesPerDay);
+  return currentTicketsSold + (effectiveVelocity * daysToEvent);
+}
+
+/**
  * Calculate all sales pacing metrics
  */
 export function calculateSalesPacing(input: PacingInput): CalculatedPacing {
@@ -70,23 +106,36 @@ export function calculateSalesPacing(input: PacingInput): CalculatedPacing {
 }
 
 /**
- * Classify pacing status based on current vs required velocity
+ * Classify pacing status based on current performance vs target
  */
 export function classifyPacingStatus(
-  projectedFinalTickets: number,
-  targetTickets: number
+  currentTicketsSold: number,
+  targetTickets: number,
+  daysToEvent: number,
+  ticketsRemaining: number
 ): PacingStatus {
-  const percentOfTarget = (projectedFinalTickets / targetTickets) * 100;
+  const percentOfTarget = (currentTicketsSold / targetTickets) * 100;
+  const requiredDailyRate = daysToEvent > 0 ? ticketsRemaining / daysToEvent : 0;
+  const daysElapsed = 90 - daysToEvent; // Assume 90-day on-sale period
+  const currentDailyRate = daysElapsed > 0 ? currentTicketsSold / daysElapsed : 0;
 
+  // Critical: Less than 70% sold with less than 14 days remaining
+  if (percentOfTarget < 70 && daysToEvent <= 14) {
+    return 'critical';
+  }
+
+  // Behind: Current pace won't meet target
+  if (currentDailyRate < requiredDailyRate * 0.9) {
+    return 'behind';
+  }
+
+  // Ahead: Over 100% of target already
   if (percentOfTarget >= 100) {
     return 'ahead';
-  } else if (percentOfTarget >= 95) {
-    return 'on_pace';
-  } else if (percentOfTarget >= 85) {
-    return 'slightly_behind';
-  } else {
-    return 'significantly_behind';
   }
+
+  // On pace: Within 10% of required rate
+  return 'on_pace';
 }
 
 /**

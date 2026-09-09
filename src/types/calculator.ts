@@ -49,7 +49,7 @@ export interface SalesPacing {
   pacingStatus: PacingStatus;
 }
 
-export type PacingStatus = 'ahead' | 'on_pace' | 'slightly_behind' | 'significantly_behind';
+export type PacingStatus = 'ahead' | 'on_pace' | 'behind' | 'critical';
 
 export interface CalculatedPacing {
   currentVelocity: number;
