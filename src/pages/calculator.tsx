@@ -9,6 +9,8 @@ import { VelocityMetricsCard } from "@/components/EventEconomics/VelocityMetrics
 import { SalesPacingChart } from "@/components/EventEconomics/SalesPacingChart";
 import { MediaChannelForm } from "@/components/MediaChannelForm";
 import { MediaMixSummary } from "@/components/MediaMixSummary";
+import { ResultsSummary } from "@/components/ResultsSummary";
+import { AIInsights } from "@/components/AIInsights";
 import { AIAssistantModal } from "@/components/AIAssistantModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -564,11 +566,32 @@ export default function Calculator() {
             <MediaMixSummary summary={mediaMixSummary} />
           </div>
 
+          {/* Results & Recommendations Section */}
           <div className="border-t border-slate-200 pt-8">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Coming Next:</strong> Results & Recommendations dashboard with AI-powered marketing insights and optimization strategies.
-              </p>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Results & Recommendations</h2>
+            <p className="text-slate-600 mb-6">
+              Executive summary of campaign performance with AI-powered strategic insights and optimization recommendations.
+            </p>
+
+            <div className="space-y-6">
+              <ResultsSummary
+                currentTicketsSold={eventData.currentTicketsSold}
+                targetTickets={ticketEconomics.targetTickets}
+                ticketsRemaining={ticketEconomics.ticketsRemaining}
+                daysToEvent={eventData.daysToEvent}
+                mediaMixSummary={mediaMixSummary}
+                avgTicketPrice={eventData.avgTicketPrice}
+              />
+
+              <AIInsights
+                eventName={eventData.eventName}
+                marketCity={eventData.marketCity}
+                daysToEvent={eventData.daysToEvent}
+                currentTicketsSold={eventData.currentTicketsSold}
+                targetTickets={ticketEconomics.targetTickets}
+                mediaMixSummary={mediaMixSummary}
+                avgTicketPrice={eventData.avgTicketPrice}
+              />
             </div>
           </div>
         </div>
