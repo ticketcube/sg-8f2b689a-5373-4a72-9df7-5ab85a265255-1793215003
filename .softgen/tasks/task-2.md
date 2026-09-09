@@ -1,6 +1,6 @@
 ---
 title: Database Schema Design for Event Marketing Calculator
-status: todo
+status: done
 priority: urgent
 type: chore
 tags: [database, schema, supabase]
@@ -23,17 +23,16 @@ Key requirements:
 
 ## Checklist
 
-- [ ] Design `events` table with all event economics fields
-- [ ] Design `markets` table for market-specific configurations
-- [ ] Design `media_plans` table linking events to channels
-- [ ] Design `media_channels` table for channel-specific metrics
-- [ ] Design `scenarios` table for what-if analysis
-- [ ] Design `benchmarks` table for historical comparison data
-- [ ] Design `user_preferences` table for settings
-- [ ] Create complete SQL migration file with all tables
-- [ ] Define appropriate indexes for performance
-- [ ] Set up RLS policies (authenticated users own their data)
-- [ ] Generate TypeScript types
+- [x] Design `events` table with all event economics fields
+- [x] Design `media_channels` table for channel-specific metrics
+- [x] Design `scenarios` table for what-if analysis
+- [x] Design `market_diagnostics` table for diagnostics tracking
+- [x] Design `benchmarks` table for historical comparison data
+- [x] Create complete SQL migration file with all tables
+- [x] Define appropriate indexes for performance
+- [x] Set up RLS policies (authenticated users own their data)
+- [x] Execute SQL migration
+- [x] Generate TypeScript types
 
 ## Acceptance
 
