@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -11,7 +11,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -222,6 +222,42 @@ export type Database = {
           secondary_vibe?: string | null
           top_list?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      benchmarks: {
+        Row: {
+          avg_cpt: number
+          avg_roas: number
+          avg_sellthrough_pct: number
+          created_at: string | null
+          event_type: string
+          id: string
+          market: string
+          sample_size: number | null
+          user_id: string
+        }
+        Insert: {
+          avg_cpt: number
+          avg_roas: number
+          avg_sellthrough_pct: number
+          created_at?: string | null
+          event_type: string
+          id?: string
+          market: string
+          sample_size?: number | null
+          user_id: string
+        }
+        Update: {
+          avg_cpt?: number
+          avg_roas?: number
+          avg_sellthrough_pct?: number
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          market?: string
+          sample_size?: number | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -612,6 +648,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      events: {
+        Row: {
+          artist_production: string
+          avg_ticket_price: number
+          created_at: string | null
+          current_gross_revenue: number
+          current_tickets_sold: number
+          days_to_event: number | null
+          event_date: string
+          event_name: string
+          expected_organic_sales_per_day: number | null
+          historical_sellthrough_pct: number | null
+          id: string
+          learning_mode: boolean | null
+          market_city: string
+          pacing_status: string | null
+          premium_ticket_pct: number
+          premium_ticket_price: number
+          standard_ticket_price: number
+          target_gross_revenue: number
+          target_sellthrough_pct: number
+          updated_at: string | null
+          user_id: string
+          venue: string
+          venue_capacity: number
+        }
+        Insert: {
+          artist_production: string
+          avg_ticket_price: number
+          created_at?: string | null
+          current_gross_revenue?: number
+          current_tickets_sold?: number
+          days_to_event?: number | null
+          event_date: string
+          event_name: string
+          expected_organic_sales_per_day?: number | null
+          historical_sellthrough_pct?: number | null
+          id?: string
+          learning_mode?: boolean | null
+          market_city: string
+          pacing_status?: string | null
+          premium_ticket_pct?: number
+          premium_ticket_price: number
+          standard_ticket_price: number
+          target_gross_revenue: number
+          target_sellthrough_pct?: number
+          updated_at?: string | null
+          user_id: string
+          venue: string
+          venue_capacity: number
+        }
+        Update: {
+          artist_production?: string
+          avg_ticket_price?: number
+          created_at?: string | null
+          current_gross_revenue?: number
+          current_tickets_sold?: number
+          days_to_event?: number | null
+          event_date?: string
+          event_name?: string
+          expected_organic_sales_per_day?: number | null
+          historical_sellthrough_pct?: number | null
+          id?: string
+          learning_mode?: boolean | null
+          market_city?: string
+          pacing_status?: string | null
+          premium_ticket_pct?: number
+          premium_ticket_price?: number
+          standard_ticket_price?: number
+          target_gross_revenue?: number
+          target_sellthrough_pct?: number
+          updated_at?: string | null
+          user_id?: string
+          venue?: string
+          venue_capacity?: number
+        }
+        Relationships: []
       }
       fandragon_waitlist: {
         Row: {
@@ -1197,6 +1311,100 @@ export type Database = {
         }
         Relationships: []
       }
+      market_diagnostics: {
+        Row: {
+          created_at: string | null
+          diagnostic_type: string
+          event_id: string
+          id: string
+          notes: string | null
+          recommended_action: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          diagnostic_type: string
+          event_id: string
+          id?: string
+          notes?: string | null
+          recommended_action?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          diagnostic_type?: string
+          event_id?: string
+          id?: string
+          notes?: string | null
+          recommended_action?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_diagnostics_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_channels: {
+        Row: {
+          audience_size: number | null
+          budget: number
+          channel_type: string
+          click_rate: number | null
+          conversion_rate: number
+          cpc: number | null
+          cpm: number | null
+          created_at: string | null
+          ctr: number | null
+          event_id: string
+          id: string
+          incrementality_factor: number | null
+          open_rate: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          audience_size?: number | null
+          budget?: number
+          channel_type: string
+          click_rate?: number | null
+          conversion_rate?: number
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          event_id: string
+          id?: string
+          incrementality_factor?: number | null
+          open_rate?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          audience_size?: number | null
+          budget?: number
+          channel_type?: string
+          click_rate?: number | null
+          conversion_rate?: number
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          event_id?: string
+          id?: string
+          incrementality_factor?: number | null
+          open_rate?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_channels_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mind_maps: {
         Row: {
           created_at: string | null
@@ -1626,6 +1834,44 @@ export type Database = {
         }
         Relationships: []
       }
+      product_roadmap_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: number
+          parent_comment_id: number | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: number
+          parent_comment_id?: number | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: number
+          parent_comment_id?: number | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_roadmap_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "product_roadmap_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1659,6 +1905,128 @@ export type Database = {
         }
         Relationships: []
       }
+      project_boards: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          description: string | null
+          id: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          id?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      project_columns: {
+        Row: {
+          board_id: string
+          color: string | null
+          created_at: string | null
+          id: string
+          position: number | null
+          title: string
+        }
+        Insert: {
+          board_id: string
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          position?: number | null
+          title: string
+        }
+        Update: {
+          board_id?: string
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          position?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_columns_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "project_boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_tasks: {
+        Row: {
+          assigned_to: string | null
+          board_id: string
+          column_id: string
+          created_at: string | null
+          created_by: string
+          description: string | null
+          due_date: string | null
+          id: string
+          position: number | null
+          priority: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          board_id: string
+          column_id: string
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          position?: number | null
+          priority?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          board_id?: string
+          column_id?: string
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          position?: number | null
+          priority?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_tasks_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "project_boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_column_id_fkey"
+            columns: ["column_id"]
+            isOneToOne: false
+            referencedRelation: "project_columns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_items: {
         Row: {
           content: Json
@@ -1691,6 +2059,47 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      scenarios: {
+        Row: {
+          budget_multiplier: number
+          conversion_multiplier: number
+          created_at: string | null
+          demand_multiplier: number
+          event_id: string
+          id: string
+          notes: string | null
+          scenario_name: string
+        }
+        Insert: {
+          budget_multiplier?: number
+          conversion_multiplier?: number
+          created_at?: string | null
+          demand_multiplier?: number
+          event_id: string
+          id?: string
+          notes?: string | null
+          scenario_name: string
+        }
+        Update: {
+          budget_multiplier?: number
+          conversion_multiplier?: number
+          created_at?: string | null
+          demand_multiplier?: number
+          event_id?: string
+          id?: string
+          notes?: string | null
+          scenario_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenarios_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       search_cache: {
         Row: {
@@ -1798,6 +2207,173 @@ export type Database = {
           product_name?: string
         }
         Relationships: []
+      }
+      stubhub_config: {
+        Row: {
+          access_token: string | null
+          client_id: string
+          client_secret: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          scope: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          client_id: string
+          client_secret: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          scope?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          client_id?: string
+          client_secret?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          scope?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      stubhub_event_mappings: {
+        Row: {
+          created_at: string | null
+          event_date: string | null
+          id: string
+          is_active: boolean | null
+          last_synced_at: string | null
+          performer_name: string | null
+          stubhub_event_id: string
+          stubhub_listing_url: string
+          ticketcube_id: string | null
+          ticketmaster_event_id: string | null
+          updated_at: string | null
+          venue_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_synced_at?: string | null
+          performer_name?: string | null
+          stubhub_event_id: string
+          stubhub_listing_url: string
+          ticketcube_id?: string | null
+          ticketmaster_event_id?: string | null
+          updated_at?: string | null
+          venue_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_synced_at?: string | null
+          performer_name?: string | null
+          stubhub_event_id?: string
+          stubhub_listing_url?: string
+          ticketcube_id?: string | null
+          ticketmaster_event_id?: string | null
+          updated_at?: string | null
+          venue_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stubhub_event_mappings_ticketcube_id_fkey"
+            columns: ["ticketcube_id"]
+            isOneToOne: false
+            referencedRelation: "ticketcubes"
+            referencedColumns: ["cube_id"]
+          },
+          {
+            foreignKeyName: "stubhub_event_mappings_ticketmaster_event_id_fkey"
+            columns: ["ticketmaster_event_id"]
+            isOneToOne: false
+            referencedRelation: "ticketmaster_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stubhub_events: {
+        Row: {
+          artist_id: string | null
+          created_at: string | null
+          event_date: string
+          event_name: string
+          event_time: string | null
+          event_url: string | null
+          id: string
+          is_active: boolean | null
+          performer_name: string | null
+          primary_event_image: string | null
+          primary_venue_image: string | null
+          search_keyword: string | null
+          stubhub_event_id: string
+          updated_at: string | null
+          venue_city: string | null
+          venue_country: string | null
+          venue_name: string | null
+          venue_state: string | null
+        }
+        Insert: {
+          artist_id?: string | null
+          created_at?: string | null
+          event_date: string
+          event_name: string
+          event_time?: string | null
+          event_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          performer_name?: string | null
+          primary_event_image?: string | null
+          primary_venue_image?: string | null
+          search_keyword?: string | null
+          stubhub_event_id: string
+          updated_at?: string | null
+          venue_city?: string | null
+          venue_country?: string | null
+          venue_name?: string | null
+          venue_state?: string | null
+        }
+        Update: {
+          artist_id?: string | null
+          created_at?: string | null
+          event_date?: string
+          event_name?: string
+          event_time?: string | null
+          event_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          performer_name?: string | null
+          primary_event_image?: string | null
+          primary_venue_image?: string | null
+          search_keyword?: string | null
+          stubhub_event_id?: string
+          updated_at?: string | null
+          venue_city?: string | null
+          venue_country?: string | null
+          venue_name?: string | null
+          venue_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stubhub_events_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["artist_id"]
+          },
+        ]
       }
       survey_responses: {
         Row: {
@@ -2530,12 +3106,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2559,11 +3135,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2584,11 +3160,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2609,11 +3185,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2626,11 +3202,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
