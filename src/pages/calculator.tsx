@@ -7,10 +7,13 @@ import { SalesPacingForm } from "@/components/EventEconomics/SalesPacingForm";
 import { PacingStatusCard } from "@/components/EventEconomics/PacingStatusCard";
 import { VelocityMetricsCard } from "@/components/EventEconomics/VelocityMetricsCard";
 import { SalesPacingChart } from "@/components/EventEconomics/SalesPacingChart";
+import { MediaChannelForm } from "@/components/MediaChannelForm";
+import { AIAssistantModal } from "@/components/AIAssistantModal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Plus } from "lucide-react";
+import { Loader2, Save, Plus, Tv, Radio, Eye, Share2, Search, Monitor, Video, Target, Mail } from "lucide-react";
 import { calculateTicketEconomics, calculateSalesVelocity } from "@/lib/calculations";
+import type { MediaChannelType } from "@/types/calculator";
 
 interface EventData {
   id?: string;
@@ -33,6 +36,15 @@ interface EventData {
   historicalSellThroughPct: number;
 }
 
+interface MediaChannelData {
+  channelType: MediaChannelType;
+  budget: number;
+  cpm?: number;
+  cpc?: number;
+  ctr: number;
+  conversionRate: number;
+}
+
 const SAMPLE_EVENT: EventData = {
   eventName: "DroneArt: Four Seasons",
   artistProduction: "DroneArt Collective",
@@ -53,8 +65,33 @@ const SAMPLE_EVENT: EventData = {
   historicalSellThroughPct: 85,
 };
 
+const SAMPLE_MEDIA_CHANNELS: MediaChannelData[] = [
+  { channelType: 'tv_ctv', budget: 25000, cpm: 30, ctr: 0.05, conversionRate: 2.5 },
+  { channelType: 'radio_audio', budget: 15000, cpm: 20, ctr: 0.08, conversionRate: 3.0 },
+  { channelType: 'ooh', budget: 10000, cpm: 12, ctr: 0.02, conversionRate: 1.5 },
+  { channelType: 'paid_social', budget: 20000, cpm: 15, ctr: 1.2, conversionRate: 4.0 },
+  { channelType: 'paid_search', budget: 18000, cpc: 3.5, ctr: 5.0, conversionRate: 8.0 },
+  { channelType: 'display_programmatic', budget: 12000, cpm: 8, ctr: 0.3, conversionRate: 2.0 },
+  { channelType: 'youtube_video', budget: 15000, cpm: 18, ctr: 0.6, conversionRate: 3.5 },
+  { channelType: 'retargeting', budget: 10000, cpm: 12, ctr: 2.0, conversionRate: 12.0 },
+];
+
+const CHANNEL_CONFIGS = {
+  tv_ctv: { name: 'TV/CTV', icon: <Tv className="h-4 w-4" />, hasCpm: true },
+  radio_audio: { name: 'Radio/Audio', icon: <Radio className="h-4 w-4" />, hasCpm: true },
+  ooh: { name: 'Out of Home', icon: <Eye className="h-4 w-4" />, hasCpm: true },
+  paid_social: { name: 'Paid Social', icon: <Share2 className="h-4 w-4" />, hasCpm: true },
+  paid_search: { name: 'Paid Search', icon: <Search className="h-4 w-4" />, hasCpc: true },
+  display_programmatic: { name: 'Display/Programmatic', icon: <Monitor className="h-4 w-4" />, hasCpm: true },
+  youtube_video: { name: 'YouTube/Video', icon: <Video className="h-4 w-4" />, hasCpm: true },
+  retargeting: { name: 'Retargeting', icon: <Target className="h-4 w-4" />, hasCpm: true },
+};
+
 export default function Calculator() {
   const [eventData, setEventData] = useState<EventData>(SAMPLE_EVENT);
+  const [mediaChannels, setMediaChannels] = useState<MediaChannelData[]>(SAMPLE_MEDIA_CHANNELS);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiContext, setAiContext] = useState<{ channel?: string; metric?: string; eventData?: any }>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -72,7 +109,7 @@ export default function Calculator() {
     targetGrossRevenue: eventData.targetGrossRevenue,
   });
 
-  const daysElapsed = 90 - eventData.daysToEvent; // Assume 90-day on-sale period
+  const daysElapsed = 90 - eventData.daysToEvent;
   const currentVelocity = calculateSalesVelocity(eventData.currentTicketsSold, daysElapsed);
 
   const handleFieldChange = useCallback((field: string, value: string | number) => {
@@ -81,6 +118,28 @@ export default function Calculator() {
       [field]: value,
     }));
   }, []);
+
+  const handleMediaChannelChange = useCallback(
+    (channelType: MediaChannelType, field: string, value: number) => {
+      setMediaChannels((prev) =>
+        prev.map((channel) =>
+          channel.channelType === channelType
+            ? { ...channel, [field]: value }
+            : channel
+        )
+      );
+    },
+    []
+  );
+
+  const handleOpenAI = useCallback((channelType: MediaChannelType) => {
+    const config = CHANNEL_CONFIGS[channelType];
+    setAiContext({
+      channel: config.name,
+      eventData: eventData,
+    });
+    setAiModalOpen(true);
+  }, [eventData]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -273,15 +332,67 @@ export default function Calculator() {
             </div>
           </div>
 
+          {/* Media Planning Section */}
+          <div className="border-t border-slate-200 pt-8">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Media Planning</h2>
+            <p className="text-slate-600 mb-6">
+              Configure your media mix across paid channels. Click "Ask AI" on any channel to learn best practices, benchmarks, and optimization strategies.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {mediaChannels.map((channel) => {
+                const config = CHANNEL_CONFIGS[channel.channelType];
+                return (
+                  <MediaChannelForm
+                    key={channel.channelType}
+                    channelName={config.name}
+                    channelIcon={config.icon}
+                    budget={channel.budget}
+                    cpm={config.hasCpm ? channel.cpm : undefined}
+                    cpc={config.hasCpc ? channel.cpc : undefined}
+                    ctr={channel.ctr}
+                    conversionRate={channel.conversionRate}
+                    onBudgetChange={(value) =>
+                      handleMediaChannelChange(channel.channelType, 'budget', value)
+                    }
+                    onCpmChange={
+                      config.hasCpm
+                        ? (value) => handleMediaChannelChange(channel.channelType, 'cpm', value)
+                        : undefined
+                    }
+                    onCpcChange={
+                      config.hasCpc
+                        ? (value) => handleMediaChannelChange(channel.channelType, 'cpc', value)
+                        : undefined
+                    }
+                    onCtrChange={(value) =>
+                      handleMediaChannelChange(channel.channelType, 'ctr', value)
+                    }
+                    onConversionRateChange={(value) =>
+                      handleMediaChannelChange(channel.channelType, 'conversionRate', value)
+                    }
+                    onAskAI={() => handleOpenAI(channel.channelType)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
           <div className="border-t border-slate-200 pt-8">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
-                <strong>Coming Next:</strong> Media Plan and Results & Recommendations sections will be built in the following phases.
+                <strong>Coming Next:</strong> Media Mix Summary with blended metrics, budget allocation charts, and Results & Recommendations dashboard with AI-powered insights.
               </p>
             </div>
           </div>
         </div>
       </main>
+
+      <AIAssistantModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        context={aiContext}
+      />
     </div>
   );
 }

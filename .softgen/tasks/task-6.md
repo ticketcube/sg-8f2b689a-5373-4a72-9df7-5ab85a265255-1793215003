@@ -38,17 +38,17 @@ Build Section 3: Media Plan - 8 paid channels + CRM with integrated AI teaching 
 
 ## Checklist
 
-- [ ] Create `MediaChannelForm.tsx` component (reusable for all 8 channels)
+- [x] Create `MediaChannelForm.tsx` component (reusable for all 8 channels)
 - [ ] Create `CRMMarketingForm.tsx` for email/CRM section
 - [ ] Create `MediaMixSummary.tsx` (aggregate metrics dashboard)
-- [ ] Create `AIAssistantModal.tsx` (teaching/help interface)
-- [ ] Create `/api/media-insights` endpoint (OpenAI integration)
+- [x] Create `AIAssistantModal.tsx` (teaching/help interface)
+- [x] Create `/api/media-insights` endpoint (OpenAI integration)
 - [ ] Add media calculations to calculate aggregate CPT, ROAS, tickets from media
-- [ ] Add "Ask AI" buttons throughout media planning interface
+- [x] Add "Ask AI" buttons throughout media planning interface
 - [ ] Build media budget allocation pie chart
 - [ ] Build ticket contribution by channel bar chart
-- [ ] Integrate all components into calculator page
-- [ ] Add sample media plan data for DroneArt
+- [x] Integrate all components into calculator page
+- [x] Add sample media plan data for DroneArt
 
 ## Acceptance
 
