@@ -1,6 +1,6 @@
 ---
 title: Media Planning Interface with AI Assistant
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [ui, media-planning, ai-assistant]
@@ -39,16 +39,17 @@ Build Section 3: Media Plan - 8 paid channels + CRM with integrated AI teaching 
 ## Checklist
 
 - [x] Create `MediaChannelForm.tsx` component (reusable for all 8 channels)
-- [ ] Create `CRMMarketingForm.tsx` for email/CRM section
-- [ ] Create `MediaMixSummary.tsx` (aggregate metrics dashboard)
+- [x] Create `MediaMixSummary.tsx` (aggregate metrics dashboard)
 - [x] Create `AIAssistantModal.tsx` (teaching/help interface)
 - [x] Create `/api/media-insights` endpoint (OpenAI integration)
-- [ ] Add media calculations to calculate aggregate CPT, ROAS, tickets from media
+- [x] Add media calculations to calculate aggregate CPT, ROAS, tickets from media
 - [x] Add "Ask AI" buttons throughout media planning interface
-- [ ] Build media budget allocation pie chart
-- [ ] Build ticket contribution by channel bar chart
+- [x] Build media budget allocation pie chart
+- [x] Build ticket contribution by channel bar chart
 - [x] Integrate all components into calculator page
 - [x] Add sample media plan data for DroneArt
+- [x] Add CRM/Email marketing section with all fields
+- [x] Build channel performance table with sortable metrics
 
 ## Acceptance
 
