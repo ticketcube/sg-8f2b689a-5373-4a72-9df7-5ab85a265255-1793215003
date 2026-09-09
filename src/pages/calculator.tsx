@@ -3,9 +3,14 @@ import { supabase } from "@/lib/supabase";
 import { EventDetailsForm } from "@/components/EventEconomics/EventDetailsForm";
 import { TicketEconomicsForm } from "@/components/EventEconomics/TicketEconomicsForm";
 import { EconomicsKPICards } from "@/components/EventEconomics/EconomicsKPICards";
+import { SalesPacingForm } from "@/components/EventEconomics/SalesPacingForm";
+import { PacingStatusCard } from "@/components/EventEconomics/PacingStatusCard";
+import { VelocityMetricsCard } from "@/components/EventEconomics/VelocityMetricsCard";
+import { SalesPacingChart } from "@/components/EventEconomics/SalesPacingChart";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, Plus } from "lucide-react";
+import { calculateTicketEconomics, calculateSalesVelocity } from "@/lib/calculations";
 
 interface EventData {
   id?: string;
@@ -23,6 +28,9 @@ interface EventData {
   standardTicketPrice: number;
   currentGrossRevenue: number;
   targetGrossRevenue: number;
+  daysToEvent: number;
+  expectedOrganicSalesPerDay: number;
+  historicalSellThroughPct: number;
 }
 
 const SAMPLE_EVENT: EventData = {
@@ -40,6 +48,9 @@ const SAMPLE_EVENT: EventData = {
   standardTicketPrice: 90,
   currentGrossRevenue: 275000,
   targetGrossRevenue: 450000,
+  daysToEvent: 35,
+  expectedOrganicSalesPerDay: 50,
+  historicalSellThroughPct: 85,
 };
 
 export default function Calculator() {
@@ -47,6 +58,22 @@ export default function Calculator() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+
+  // Calculate derived values
+  const ticketEconomics = calculateTicketEconomics({
+    venueCapacity: eventData.venueCapacity,
+    targetSellThroughPct: eventData.targetSellThroughPct,
+    currentTicketsSold: eventData.currentTicketsSold,
+    avgTicketPrice: eventData.avgTicketPrice,
+    premiumTicketPct: eventData.premiumTicketPct,
+    premiumTicketPrice: eventData.premiumTicketPrice,
+    standardTicketPrice: eventData.standardTicketPrice,
+    currentGrossRevenue: eventData.currentGrossRevenue,
+    targetGrossRevenue: eventData.targetGrossRevenue,
+  });
+
+  const daysElapsed = 90 - eventData.daysToEvent; // Assume 90-day on-sale period
+  const currentVelocity = calculateSalesVelocity(eventData.currentTicketsSold, daysElapsed);
 
   const handleFieldChange = useCallback((field: string, value: string | number) => {
     setEventData((prev) => ({
@@ -85,6 +112,9 @@ export default function Calculator() {
         standard_ticket_price: eventData.standardTicketPrice,
         current_gross_revenue: eventData.currentGrossRevenue,
         target_gross_revenue: eventData.targetGrossRevenue,
+        days_to_event: eventData.daysToEvent,
+        expected_organic_sales_per_day: eventData.expectedOrganicSalesPerDay,
+        historical_sellthrough_pct: eventData.historicalSellThroughPct,
       };
 
       if (eventData.id) {
@@ -161,6 +191,7 @@ export default function Calculator() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
+          {/* Event Economics Section */}
           <div>
             <h2 className="text-2xl font-bold text-slate-900 mb-6">Event Economics</h2>
             <div className="space-y-6">
@@ -202,10 +233,50 @@ export default function Calculator() {
             </div>
           </div>
 
+          {/* Sales Pacing Section */}
+          <div className="border-t border-slate-200 pt-8">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Sales Pacing</h2>
+            <div className="space-y-6">
+              <SalesPacingForm
+                daysToEvent={eventData.daysToEvent}
+                expectedOrganicSalesPerDay={eventData.expectedOrganicSalesPerDay}
+                historicalSellThroughPct={eventData.historicalSellThroughPct}
+                onDaysToEventChange={(value) => handleFieldChange('daysToEvent', value)}
+                onOrganicSalesChange={(value) => handleFieldChange('expectedOrganicSalesPerDay', value)}
+                onHistoricalSellThroughChange={(value) => handleFieldChange('historicalSellThroughPct', value)}
+              />
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <PacingStatusCard
+                  currentTicketsSold={eventData.currentTicketsSold}
+                  targetTickets={ticketEconomics.targetTickets}
+                  daysToEvent={eventData.daysToEvent}
+                  ticketsRemaining={ticketEconomics.ticketsRemaining}
+                />
+
+                <VelocityMetricsCard
+                  currentTicketsSold={eventData.currentTicketsSold}
+                  daysElapsed={daysElapsed}
+                  ticketsRemaining={ticketEconomics.ticketsRemaining}
+                  daysToEvent={eventData.daysToEvent}
+                  expectedOrganicSalesPerDay={eventData.expectedOrganicSalesPerDay}
+                  targetTickets={ticketEconomics.targetTickets}
+                />
+              </div>
+
+              <SalesPacingChart
+                currentTicketsSold={eventData.currentTicketsSold}
+                targetTickets={ticketEconomics.targetTickets}
+                daysToEvent={eventData.daysToEvent}
+                currentVelocity={currentVelocity}
+              />
+            </div>
+          </div>
+
           <div className="border-t border-slate-200 pt-8">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
-                <strong>Coming Next:</strong> Sales Pacing, Media Plan, and Results & Recommendations sections will be built in the following phases.
+                <strong>Coming Next:</strong> Media Plan and Results & Recommendations sections will be built in the following phases.
               </p>
             </div>
           </div>
