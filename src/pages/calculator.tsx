@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { EventDetailsForm } from "@/components/EventEconomics/EventDetailsForm";
 import { TicketEconomicsForm } from "@/components/EventEconomics/TicketEconomicsForm";
@@ -8,12 +8,16 @@ import { PacingStatusCard } from "@/components/EventEconomics/PacingStatusCard";
 import { VelocityMetricsCard } from "@/components/EventEconomics/VelocityMetricsCard";
 import { SalesPacingChart } from "@/components/EventEconomics/SalesPacingChart";
 import { MediaChannelForm } from "@/components/MediaChannelForm";
+import { MediaMixSummary } from "@/components/MediaMixSummary";
 import { AIAssistantModal } from "@/components/AIAssistantModal";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Plus, Tv, Radio, Eye, Share2, Search, Monitor, Video, Target, Mail } from "lucide-react";
-import { calculateTicketEconomics, calculateSalesVelocity } from "@/lib/calculations";
-import type { MediaChannelType } from "@/types/calculator";
+import { Loader2, Save, Plus, Tv, Radio, Eye, Share2, Search, Monitor, Video, Target, Mail, Sparkles } from "lucide-react";
+import { calculateTicketEconomics, calculateSalesVelocity, calculateChannelMetrics, calculateMediaMixSummary } from "@/lib/calculations";
+import type { MediaChannelType, MediaChannelInput } from "@/types/calculator";
 
 interface EventData {
   id?: string;
@@ -42,6 +46,14 @@ interface MediaChannelData {
   cpm?: number;
   cpc?: number;
   ctr: number;
+  conversionRate: number;
+}
+
+interface CRMData {
+  budget: number;
+  audienceSize: number;
+  openRate: number;
+  clickRate: number;
   conversionRate: number;
 }
 
@@ -76,6 +88,14 @@ const SAMPLE_MEDIA_CHANNELS: MediaChannelData[] = [
   { channelType: 'retargeting', budget: 10000, cpm: 12, ctr: 2.0, conversionRate: 12.0 },
 ];
 
+const SAMPLE_CRM: CRMData = {
+  budget: 5000,
+  audienceSize: 50000,
+  openRate: 25,
+  clickRate: 5,
+  conversionRate: 10,
+};
+
 const CHANNEL_CONFIGS = {
   tv_ctv: { name: 'TV/CTV', icon: <Tv className="h-4 w-4" />, hasCpm: true },
   radio_audio: { name: 'Radio/Audio', icon: <Radio className="h-4 w-4" />, hasCpm: true },
@@ -90,6 +110,7 @@ const CHANNEL_CONFIGS = {
 export default function Calculator() {
   const [eventData, setEventData] = useState<EventData>(SAMPLE_EVENT);
   const [mediaChannels, setMediaChannels] = useState<MediaChannelData[]>(SAMPLE_MEDIA_CHANNELS);
+  const [crmData, setCrmData] = useState<CRMData>(SAMPLE_CRM);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiContext, setAiContext] = useState<{ channel?: string; metric?: string; eventData?: any }>({});
   const [loading, setLoading] = useState(false);
@@ -112,6 +133,54 @@ export default function Calculator() {
   const daysElapsed = 90 - eventData.daysToEvent;
   const currentVelocity = calculateSalesVelocity(eventData.currentTicketsSold, daysElapsed);
 
+  // Calculate media mix with all channels
+  const mediaMixSummary = useMemo(() => {
+    const totalBudget = mediaChannels.reduce((sum, ch) => sum + ch.budget, 0) + crmData.budget;
+
+    // Calculate paid channel metrics
+    const paidChannelMetrics = mediaChannels.map(channel => {
+      const input: MediaChannelInput = {
+        channelType: channel.channelType,
+        budget: channel.budget,
+        cpm: channel.cpm,
+        cpc: channel.cpc,
+        ctr: channel.ctr,
+        conversionRate: channel.conversionRate,
+        incrementalityFactor: 1.0,
+      };
+      return calculateChannelMetrics(input, eventData.avgTicketPrice, totalBudget);
+    });
+
+    // Calculate CRM metrics
+    const impressions = crmData.audienceSize;
+    const opens = impressions * (crmData.openRate / 100);
+    const clicks = opens * (crmData.clickRate / 100);
+    const conversions = clicks * (crmData.conversionRate / 100);
+    const incrementalTickets = Math.round(conversions);
+    const costPerTicket = incrementalTickets > 0 ? crmData.budget / incrementalTickets : 0;
+    const revenue = incrementalTickets * eventData.avgTicketPrice;
+    const roas = crmData.budget > 0 ? revenue / crmData.budget : 0;
+
+    const crmMetrics = {
+      channelType: 'crm_email' as MediaChannelType,
+      budget: crmData.budget,
+      budgetPct: totalBudget > 0 ? (crmData.budget / totalBudget) * 100 : 0,
+      impressions: Math.round(impressions),
+      clicks: Math.round(clicks),
+      conversions: Math.round(conversions),
+      attributedTickets: incrementalTickets,
+      incrementalTickets,
+      costPerTicket,
+      revenue,
+      roas,
+    };
+
+    // Combine all channels
+    const allChannels = [...paidChannelMetrics, crmMetrics];
+
+    return calculateMediaMixSummary(allChannels);
+  }, [mediaChannels, crmData, eventData.avgTicketPrice]);
+
   const handleFieldChange = useCallback((field: string, value: string | number) => {
     setEventData((prev) => ({
       ...prev,
@@ -132,8 +201,17 @@ export default function Calculator() {
     []
   );
 
-  const handleOpenAI = useCallback((channelType: MediaChannelType) => {
-    const config = CHANNEL_CONFIGS[channelType];
+  const handleCRMChange = useCallback((field: keyof CRMData, value: number) => {
+    setCrmData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }, []);
+
+  const handleOpenAI = useCallback((channelType: MediaChannelType | 'crm') => {
+    const config = channelType === 'crm' 
+      ? { name: 'CRM/Email Marketing' } 
+      : CHANNEL_CONFIGS[channelType];
     setAiContext({
       channel: config.name,
       eventData: eventData,
@@ -214,6 +292,15 @@ export default function Calculator() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
   };
 
   return (
@@ -339,7 +426,7 @@ export default function Calculator() {
               Configure your media mix across paid channels. Click "Ask AI" on any channel to learn best practices, benchmarks, and optimization strategies.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               {mediaChannels.map((channel) => {
                 const config = CHANNEL_CONFIGS[channel.channelType];
                 return (
@@ -376,12 +463,111 @@ export default function Calculator() {
                 );
               })}
             </div>
+
+            {/* CRM/Email Marketing */}
+            <Card className="border-slate-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    CRM / Email Marketing
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenAI('crm')}
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  >
+                    <Sparkles className="h-4 w-4 mr-1" />
+                    Ask AI
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div>
+                    <Label htmlFor="crm-budget" className="text-xs">Budget</Label>
+                    <Input
+                      id="crm-budget"
+                      type="number"
+                      value={crmData.budget}
+                      onChange={(e) => handleCRMChange('budget', Number(e.target.value))}
+                      className="mt-1"
+                      min="0"
+                      step="500"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">{formatCurrency(crmData.budget)}</p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="crm-audience" className="text-xs">Audience Size</Label>
+                    <Input
+                      id="crm-audience"
+                      type="number"
+                      value={crmData.audienceSize}
+                      onChange={(e) => handleCRMChange('audienceSize', Number(e.target.value))}
+                      className="mt-1"
+                      min="0"
+                      step="1000"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="crm-open" className="text-xs">Open Rate (%)</Label>
+                    <Input
+                      id="crm-open"
+                      type="number"
+                      value={crmData.openRate}
+                      onChange={(e) => handleCRMChange('openRate', Number(e.target.value))}
+                      className="mt-1"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="crm-click" className="text-xs">Click Rate (%)</Label>
+                    <Input
+                      id="crm-click"
+                      type="number"
+                      value={crmData.clickRate}
+                      onChange={(e) => handleCRMChange('clickRate', Number(e.target.value))}
+                      className="mt-1"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="crm-conversion" className="text-xs">Conversion (%)</Label>
+                    <Input
+                      id="crm-conversion"
+                      type="number"
+                      value={crmData.conversionRate}
+                      onChange={(e) => handleCRMChange('conversionRate', Number(e.target.value))}
+                      className="mt-1"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Media Mix Summary */}
+          <div className="border-t border-slate-200 pt-8">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Media Mix Summary</h2>
+            <MediaMixSummary summary={mediaMixSummary} />
           </div>
 
           <div className="border-t border-slate-200 pt-8">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
-                <strong>Coming Next:</strong> Media Mix Summary with blended metrics, budget allocation charts, and Results & Recommendations dashboard with AI-powered insights.
+                <strong>Coming Next:</strong> Results & Recommendations dashboard with AI-powered marketing insights and optimization strategies.
               </p>
             </div>
           </div>
