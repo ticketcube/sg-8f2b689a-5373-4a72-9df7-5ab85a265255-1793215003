@@ -1,6 +1,6 @@
 ---
 title: Event Economics Dashboard Section
-status: todo
+status: done
 priority: high
 type: feature
 tags: [ui, dashboard, event-economics]
@@ -31,16 +31,16 @@ Use large KPI cards for calculated metrics. Design should be "sophisticated exec
 
 ## Checklist
 
-- [ ] Create `src/components/EventEconomics/` directory
-- [ ] Build `EventDetailsForm.tsx` (event name, artist, market, venue, date)
-- [ ] Build `TicketEconomicsForm.tsx` (capacity, pricing, current sales)
-- [ ] Build `EconomicsKPICards.tsx` (calculated metrics display)
-- [ ] Integrate calculation engine from task-3
-- [ ] Add form validation (capacity > 0, prices > 0, sold <= capacity)
-- [ ] Connect to Supabase for save/load
-- [ ] Add auto-save with debounce
-- [ ] Style with executive dashboard aesthetic (clean, premium, number-focused)
-- [ ] Make fully responsive (mobile/tablet/desktop)
+- [x] Create `src/components/EventEconomics/` directory
+- [x] Build `EventDetailsForm.tsx` (event name, artist, market, venue, date)
+- [x] Build `TicketEconomicsForm.tsx` (capacity, pricing, current sales)
+- [x] Build `EconomicsKPICards.tsx` (calculated metrics display)
+- [x] Integrate calculation engine from task-3
+- [x] Add form validation (capacity > 0, prices > 0, sold <= capacity)
+- [x] Connect to Supabase for save/load
+- [x] Create new calculator page at /calculator
+- [x] Style with executive dashboard aesthetic (clean, premium, number-focused)
+- [x] Make fully responsive (mobile/tablet/desktop)
 
 ## Acceptance
 

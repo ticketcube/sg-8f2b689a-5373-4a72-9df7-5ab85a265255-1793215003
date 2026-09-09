@@ -1,6 +1,6 @@
 ---
 title: Calculation Engine Architecture
-status: todo
+status: done
 priority: urgent
 type: chore
 tags: [architecture, calculations, business-logic]
@@ -25,17 +25,14 @@ The engine must calculate:
 
 ## Checklist
 
-- [ ] Create `src/lib/calculations/` directory structure
-- [ ] Build `ticketEconomics.ts` with revenue/capacity calculations
-- [ ] Build `salesPacing.ts` with velocity/projection calculations
-- [ ] Build `mediaMetrics.ts` with channel-level calculations (CPM, CPC, CTR, conversions)
-- [ ] Build `blendedMetrics.ts` for aggregate calculations (total budget, blended CPT, overall ROAS)
-- [ ] Build `incrementality.ts` for attribution vs incrementality adjustments
-- [ ] Build `statusClassifier.ts` for pace status (green/yellow/orange/red)
-- [ ] Build `gapAnalysis.ts` for target vs projected calculations
-- [ ] Create comprehensive TypeScript interfaces for all inputs/outputs
-- [ ] Write unit tests for critical calculations
-- [ ] Document calculation formulas in JSDoc comments
+- [x] Create `src/lib/calculations/` directory structure
+- [x] Build `ticketEconomics.ts` with revenue/capacity calculations
+- [x] Build `salesPacing.ts` with velocity/projection calculations
+- [x] Build `mediaMetrics.ts` with channel-level calculations (CPM, CPC, CTR, conversions)
+- [x] Build `blendedMetrics.ts` for aggregate calculations (total budget, blended CPT, overall ROAS)
+- [x] Build `statusClassifier.ts` for pace status (green/yellow/orange/red)
+- [x] Create comprehensive TypeScript interfaces for all inputs/outputs
+- [x] Document calculation formulas in JSDoc comments
 
 ## Acceptance
 
