@@ -14,10 +14,10 @@ export default async function handler(
   }
 
   try {
-    const { messages } = req.body;
+    const { question, context } = req.body;
 
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: "Invalid messages format" });
+    if (!question || typeof question !== "string") {
+      return res.status(400).json({ error: "Invalid question format" });
     }
 
     const completion = await openai.chat.completions.create({
@@ -49,17 +49,29 @@ For "good" metrics:
 - ROAS: 3:1 is breakeven (after fees), 5:1+ is strong, 8:1+ is exceptional
 - Conversion rates: 2-5% is standard for cold traffic, 10%+ for retargeting/CRM
 
+When providing strategic insights for Results & Recommendations, format as JSON array with this structure:
+[
+  {
+    "category": "Campaign Health" | "Budget Efficiency" | "Channel Performance" | "Risk" | "Opportunity",
+    "observation": "Specific data-driven observation",
+    "recommendation": "Concrete actionable recommendation"
+  }
+]
+
 Always relate advice to the user's specific event context when provided. Be conversational, practical, and encouraging.`,
         },
-        ...messages,
+        {
+          role: "user",
+          content: question,
+        },
       ],
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 800,
     });
 
-    const message = completion.choices[0]?.message?.content || "I'm not sure how to help with that. Could you rephrase your question?";
+    const answer = completion.choices[0]?.message?.content || "I'm not sure how to help with that. Could you rephrase your question?";
 
-    return res.status(200).json({ message });
+    return res.status(200).json({ answer });
   } catch (error) {
     console.error("Media insights error:", error);
     return res.status(500).json({
