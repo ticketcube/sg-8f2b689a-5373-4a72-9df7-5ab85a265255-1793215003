@@ -1,12 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Target, Ticket, DollarSign, Percent } from "lucide-react";
-import {
-  calculateTotalRevenuePotential,
-  calculateTargetTickets,
-  calculateTicketsRemaining,
-  calculateCurrentSellThrough,
-  calculateRevenueRemaining,
-} from "@/lib/calculations";
+import { calculateTicketEconomics } from "@/lib/calculations";
+import type { TicketEconomics } from "@/types/calculator";
 
 interface EconomicsKPICardsProps {
   venueCapacity: number;
@@ -25,11 +20,19 @@ export function EconomicsKPICards({
   currentGrossRevenue,
   targetGrossRevenue,
 }: EconomicsKPICardsProps) {
-  const totalRevenuePotential = calculateTotalRevenuePotential(venueCapacity, avgTicketPrice);
-  const targetTickets = calculateTargetTickets(venueCapacity, targetSellThroughPct);
-  const ticketsRemaining = calculateTicketsRemaining(targetTickets, currentTicketsSold);
-  const currentSellThrough = calculateCurrentSellThrough(currentTicketsSold, venueCapacity);
-  const revenueRemaining = calculateRevenueRemaining(targetGrossRevenue, currentGrossRevenue);
+  const ticketEconomicsInput: TicketEconomics = {
+    venueCapacity,
+    targetSellThroughPct,
+    currentTicketsSold,
+    avgTicketPrice,
+    premiumTicketPct: 0,
+    premiumTicketPrice: 0,
+    standardTicketPrice: 0,
+    currentGrossRevenue,
+    targetGrossRevenue,
+  };
+
+  const calculated = calculateTicketEconomics(ticketEconomicsInput);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -59,7 +62,7 @@ export function EconomicsKPICards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-900">
-            {formatCurrency(totalRevenuePotential)}
+            {formatCurrency(calculated.totalRevenuePotential)}
           </div>
           <p className="text-xs text-slate-500 mt-1">
             {formatNumber(venueCapacity)} capacity × {formatCurrency(avgTicketPrice)}
@@ -76,7 +79,7 @@ export function EconomicsKPICards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-900">
-            {formatNumber(targetTickets)}
+            {formatNumber(calculated.targetTickets)}
           </div>
           <p className="text-xs text-slate-500 mt-1">
             {formatPercent(targetSellThroughPct)} sell-through
@@ -93,10 +96,10 @@ export function EconomicsKPICards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-900">
-            {formatNumber(ticketsRemaining)}
+            {formatNumber(calculated.ticketsRemaining)}
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            {formatNumber(currentTicketsSold)} sold / {formatNumber(targetTickets)} target
+            {formatNumber(currentTicketsSold)} sold / {formatNumber(calculated.targetTickets)} target
           </p>
         </CardContent>
       </Card>
@@ -110,7 +113,7 @@ export function EconomicsKPICards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-900">
-            {formatPercent(currentSellThrough)}
+            {formatPercent(calculated.currentSellThroughPct)}
           </div>
           <p className="text-xs text-slate-500 mt-1">
             {formatNumber(currentTicketsSold)} / {formatNumber(venueCapacity)} capacity
@@ -127,7 +130,7 @@ export function EconomicsKPICards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-slate-900">
-            {formatCurrency(revenueRemaining)}
+            {formatCurrency(calculated.revenueRemaining)}
           </div>
           <p className="text-xs text-slate-500 mt-1">
             {formatCurrency(currentGrossRevenue)} / {formatCurrency(targetGrossRevenue)} target
