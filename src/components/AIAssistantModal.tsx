@@ -42,30 +42,29 @@ export function AIAssistantModal({ open, onOpenChange, context }: AIAssistantMod
     setLoading(true);
 
     try {
-      // Build context-aware prompt
-      let systemPrompt = `You are an expert event marketing strategist and educator. Help the user understand marketing channels, metrics, and strategies for live events.`;
+      // Build context-aware question
+      let fullQuestion = input;
       
       if (context?.channel) {
-        systemPrompt += ` The user is asking about ${context.channel}.`;
+        fullQuestion = `Question about ${context.channel}: ${input}`;
       }
       
-      if (context?.metric) {
-        systemPrompt += ` They're specifically interested in the metric: ${context.metric}.`;
+      if (context?.eventData) {
+        fullQuestion += `\n\nEvent Context: ${context.eventData.eventName} at ${context.eventData.venue} in ${context.eventData.marketCity}, ${context.eventData.venueCapacity} capacity, ${context.eventData.currentTicketsSold} tickets sold, ${context.eventData.daysToEvent} days until event.`;
       }
 
-      if (context?.eventData) {
-        systemPrompt += ` Context: ${context.eventData.eventName} at ${context.eventData.venue} in ${context.eventData.marketCity}, ${context.eventData.venueCapacity} capacity, ${context.eventData.currentTicketsSold} tickets sold, ${context.eventData.daysToEvent} days until event.`;
+      // Include conversation history in the question
+      if (messages.length > 0) {
+        const conversationHistory = messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+        fullQuestion = `Previous conversation:\n${conversationHistory}\n\nCurrent question: ${fullQuestion}`;
       }
 
       const response = await fetch("/api/media-insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages,
-            userMessage,
-          ],
+          question: fullQuestion,
+          context: context,
         }),
       });
 
@@ -76,7 +75,7 @@ export function AIAssistantModal({ open, onOpenChange, context }: AIAssistantMod
       const data = await response.json();
       const assistantMessage: Message = {
         role: "assistant",
-        content: data.message,
+        content: data.answer,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
