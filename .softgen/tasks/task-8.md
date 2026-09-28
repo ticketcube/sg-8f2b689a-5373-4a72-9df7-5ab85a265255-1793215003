@@ -1,6 +1,6 @@
 ---
 title: Personal Secretary Design System
-status: in_progress
+status: done
 priority: urgent
 type: chore
 tags: [design-system, theme]
