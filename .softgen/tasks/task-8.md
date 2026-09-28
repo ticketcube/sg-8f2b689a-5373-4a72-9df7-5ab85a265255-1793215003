@@ -14,10 +14,10 @@ Set up the Personal Secretary aesthetic: navy/charcoal/gold palette with Cormora
 
 ## Checklist
 - [x] Create project.md with complete design specifications
-- [ ] Update globals.css with Personal Secretary color tokens
-- [ ] Configure tailwind.config.ts with serif/sans/mono fonts
-- [ ] Import fonts from Google Fonts (Cormorant Garamond, Inter, JetBrains Mono)
-- [ ] Verify contrast ratios meet WCAG AA standards
+- [x] Update globals.css with Personal Secretary color tokens
+- [x] Configure tailwind.config.ts with serif/sans/mono fonts
+- [x] Import fonts from Google Fonts (Cormorant Garamond, Inter, JetBrains Mono)
+- [x] Verify contrast ratios meet WCAG AA standards
 
 ## Acceptance
 - Design tokens are defined and usable as Tailwind classes
