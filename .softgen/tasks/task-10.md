@@ -1,6 +1,6 @@
 ---
 title: AI Agent Chat Interface
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [chat, ai, interface]
