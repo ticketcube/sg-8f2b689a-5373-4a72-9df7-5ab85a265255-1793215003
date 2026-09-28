@@ -4,7 +4,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Search, FolderPlus, LogOut, User } from "lucide-react";
+import { MessageSquare, Search, FolderPlus, LogOut, User, Bookmark } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -16,9 +16,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savedItemsCount, setSavedItemsCount] = useState(0);
+  const [recentItems, setRecentItems] = useState<any[]>([]);
 
   useEffect(() => {
     checkAuth();
+    loadStats();
   }, []);
 
   const checkAuth = async () => {
@@ -40,6 +43,27 @@ export default function DashboardPage() {
     }
     setLoading(false);
   };
+
+  async function loadStats() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { count: itemsCount } = await supabase
+      .from("saved_items")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", session.user.id);
+
+    setSavedItemsCount(itemsCount || 0);
+
+    const { data: items } = await supabase
+      .from("saved_items")
+      .select("id, title, created_at")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false })
+      .limit(3);
+
+    setRecentItems(items || []);
+  }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -133,7 +157,7 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="font-serif">Recent Conversations</CardTitle>
@@ -152,9 +176,25 @@ export default function DashboardPage() {
               <CardDescription>Quick access to your storage</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No items saved yet. Start organizing your information.
-              </p>
+              <div className="mb-4">
+                <p className="text-3xl font-bold text-foreground">{savedItemsCount}</p>
+                <p className="text-sm text-muted-foreground">Total items stored</p>
+              </div>
+              {recentItems.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  <p className="text-sm font-medium">Recent:</p>
+                  {recentItems.map((item) => (
+                    <div key={item.id} className="text-sm text-muted-foreground truncate">
+                      • {item.title}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Link href="/storage">
+                <Button variant="outline" className="w-full">
+                  View All Items
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>

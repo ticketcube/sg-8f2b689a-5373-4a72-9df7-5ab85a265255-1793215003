@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { MessageSquare, Send, Plus, Trash2, LogOut } from "lucide-react";
+import { MessageSquare, Send, Plus, Trash2, LogOut, Bookmark } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -31,6 +31,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -192,6 +193,36 @@ export default function ChatPage() {
     }
   };
 
+  async function handleSaveMessage(message: any) {
+    if (!message.content || isSaving) return;
+    
+    setIsSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { error } = await supabase
+      .from("saved_items")
+      .insert({
+        user_id: session.user.id,
+        type: "chat",
+        title: `Chat: ${message.content.slice(0, 50)}...`,
+        content: { 
+          message: message.content,
+          role: message.role,
+          timestamp: message.timestamp 
+        },
+        metadata: { 
+          conversation_id: currentConversationId,
+          tags: ["chat", "ai-response"]
+        }
+      });
+
+    if (!error) {
+      alert("Message saved to storage!");
+    }
+    setIsSaving(false);
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -323,6 +354,17 @@ export default function ChatPage() {
                           </p>
                         </CardContent>
                       </Card>
+                      {message.role === "assistant" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSaveMessage(message)}
+                          disabled={isSaving}
+                          className="self-start mt-2"
+                        >
+                          <Bookmark className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   ))
                 )}

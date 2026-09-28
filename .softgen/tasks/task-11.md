@@ -13,12 +13,12 @@ position: 4
 Private storage system for each user to save important information, documents, notes, and conversation excerpts. Semantic search to find stored items quickly.
 
 ## Checklist
-- [ ] Create saved_items table with full-text search
-- [ ] Build storage interface with save/edit/delete
-- [ ] Add tagging and categorization
-- [ ] Implement search functionality
-- [ ] Create quick-save from chat conversations
-- [ ] Add item detail view with metadata
+- [x] Create saved_items table with full-text search
+- [x] Build storage interface with save/edit/delete
+- [x] Add tagging and categorization
+- [x] Implement search functionality
+- [x] Create quick-save from chat conversations
+- [x] Add item detail view with metadata
 
 ## Acceptance
 - Users can save items with titles, content, and tags
