@@ -153,8 +153,9 @@ export default function ChatPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          conversationId: currentConversationId,
-          messages: updatedMessages
+          message: input.trim(),
+          conversationMessages: messages,
+          conversationId: currentConversationId
         })
       });
 
@@ -165,7 +166,7 @@ export default function ChatPage() {
       const data = await response.json();
       const assistantMessage: Message = {
         role: "assistant",
-        content: data.reply
+        content: data.response
       };
 
       const finalMessages = [...updatedMessages, assistantMessage];
@@ -175,7 +176,7 @@ export default function ChatPage() {
         .from("conversations")
         .update({
           messages: finalMessages,
-          title: updatedMessages.length === 1 ? input.trim().slice(0, 50) : undefined,
+          title: messages.length === 0 ? input.trim().slice(0, 50) : undefined,
           updated_at: new Date().toISOString()
         })
         .eq("id", currentConversationId);
