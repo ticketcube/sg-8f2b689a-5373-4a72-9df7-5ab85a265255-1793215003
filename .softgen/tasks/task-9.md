@@ -1,6 +1,6 @@
 ---
 title: Family Authentication & User Management
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [auth, supabase, users]
@@ -13,11 +13,11 @@ position: 2
 Multi-user authentication system where each family member has their own private account. Supabase Auth with email/password. User profiles with RLS to ensure data isolation.
 
 ## Checklist
-- [ ] Create user_profiles table with RLS policies
-- [ ] Build login/signup pages with email/password
-- [ ] Add profile management page
-- [ ] Implement session management and protected routes
-- [ ] Add user settings (name, preferences)
+- [x] Create user_profiles table with RLS policies
+- [x] Build login/signup pages with email/password
+- [x] Add profile management page
+- [x] Implement session management and protected routes
+- [x] Add user settings (name, preferences)
 
 ## Acceptance
 - Family members can create accounts and log in
