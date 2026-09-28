@@ -149,9 +149,18 @@ export default function ChatPage() {
     setSending(true);
 
     try {
+      // Get current session for auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Not authenticated");
+      }
+
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
           message: input.trim(),
           conversationMessages: messages,
@@ -160,7 +169,8 @@ export default function ChatPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to get response");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to get response");
       }
 
       const data = await response.json();
@@ -186,7 +196,7 @@ export default function ChatPage() {
       console.error("Error sending message:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: "I apologize, but I encountered an error processing your request. Please try again."
+        content: error instanceof Error ? error.message : "I apologize, but I encountered an error processing your request. Please try again."
       };
       setMessages([...updatedMessages, errorMessage]);
     } finally {
