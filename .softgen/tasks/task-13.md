@@ -1,6 +1,6 @@
 ---
 title: Shared Family Calendar
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [calendar, shared, events]
