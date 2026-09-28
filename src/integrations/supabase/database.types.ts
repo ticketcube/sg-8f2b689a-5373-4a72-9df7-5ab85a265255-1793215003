@@ -149,6 +149,7 @@ export type Database = {
       }
       artists: {
         Row: {
+          all_genres: Json | null
           artist_audiolink: string | null
           artist_bio: string | null
           artist_genre: string | null
@@ -168,12 +169,19 @@ export type Database = {
           attraction_id: string | null
           cityid: number | null
           created_at: string | null
+          primary_genre_id: string | null
+          primary_genre_name: string | null
+          primary_subgenre_id: string | null
+          primary_subgenre_name: string | null
           primary_vibe: string | null
           secondary_vibe: string | null
+          segment_id: string | null
+          segment_name: string | null
           top_list: string | null
           updated_at: string | null
         }
         Insert: {
+          all_genres?: Json | null
           artist_audiolink?: string | null
           artist_bio?: string | null
           artist_genre?: string | null
@@ -193,12 +201,19 @@ export type Database = {
           attraction_id?: string | null
           cityid?: number | null
           created_at?: string | null
+          primary_genre_id?: string | null
+          primary_genre_name?: string | null
+          primary_subgenre_id?: string | null
+          primary_subgenre_name?: string | null
           primary_vibe?: string | null
           secondary_vibe?: string | null
+          segment_id?: string | null
+          segment_name?: string | null
           top_list?: string | null
           updated_at?: string | null
         }
         Update: {
+          all_genres?: Json | null
           artist_audiolink?: string | null
           artist_bio?: string | null
           artist_genre?: string | null
@@ -218,8 +233,14 @@ export type Database = {
           attraction_id?: string | null
           cityid?: number | null
           created_at?: string | null
+          primary_genre_id?: string | null
+          primary_genre_name?: string | null
+          primary_subgenre_id?: string | null
+          primary_subgenre_name?: string | null
           primary_vibe?: string | null
           secondary_vibe?: string | null
+          segment_id?: string | null
+          segment_name?: string | null
           top_list?: string | null
           updated_at?: string | null
         }
@@ -649,6 +670,57 @@ export type Database = {
           },
         ]
       }
+      detections: {
+        Row: {
+          bounding_box: Json | null
+          confidence: number
+          created_at: string
+          frame_id: string | null
+          id: string
+          metadata: Json | null
+          object_type: string
+          tracking_id: string | null
+          video_id: string
+        }
+        Insert: {
+          bounding_box?: Json | null
+          confidence: number
+          created_at?: string
+          frame_id?: string | null
+          id?: string
+          metadata?: Json | null
+          object_type: string
+          tracking_id?: string | null
+          video_id: string
+        }
+        Update: {
+          bounding_box?: Json | null
+          confidence?: number
+          created_at?: string
+          frame_id?: string | null
+          id?: string
+          metadata?: Json | null
+          object_type?: string
+          tracking_id?: string | null
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detections_frame_id_fkey"
+            columns: ["frame_id"]
+            isOneToOne: false
+            referencedRelation: "video_frames"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detections_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           artist_production: string
@@ -724,6 +796,45 @@ export type Database = {
           user_id?: string
           venue?: string
           venue_capacity?: number
+        }
+        Relationships: []
+      }
+      family_events: {
+        Row: {
+          all_day: boolean | null
+          created_at: string | null
+          description: string | null
+          event_date: string
+          event_time: string | null
+          event_type: string
+          id: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          event_date: string
+          event_time?: string | null
+          event_type: string
+          id?: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          event_date?: string
+          event_time?: string | null
+          event_type?: string
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -1040,28 +1151,49 @@ export type Database = {
       }
       four_unders_waitlist: {
         Row: {
+          amount_paid: number | null
           created_at: string | null
           email: string
           id: string
           last_score: string | null
+          paid: boolean | null
           price_premium: string | null
+          referral_code: string | null
+          referred_by: string | null
           round_duration: string | null
+          stripe_checkout_id: string | null
+          stripe_payment_intent_id: string | null
+          username: string | null
         }
         Insert: {
+          amount_paid?: number | null
           created_at?: string | null
           email: string
           id?: string
           last_score?: string | null
+          paid?: boolean | null
           price_premium?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
           round_duration?: string | null
+          stripe_checkout_id?: string | null
+          stripe_payment_intent_id?: string | null
+          username?: string | null
         }
         Update: {
+          amount_paid?: number | null
           created_at?: string | null
           email?: string
           id?: string
           last_score?: string | null
+          paid?: boolean | null
           price_premium?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
           round_duration?: string | null
+          stripe_checkout_id?: string | null
+          stripe_payment_intent_id?: string | null
+          username?: string | null
         }
         Relationships: []
       }
@@ -1286,6 +1418,183 @@ export type Database = {
           last_used?: string | null
         }
         Relationships: []
+      }
+      inventory_items: {
+        Row: {
+          brand: string | null
+          brand_confidence: number | null
+          category: string
+          color: string | null
+          condition: string | null
+          created_at: string
+          description: string | null
+          distinctive_features: string | null
+          id: string
+          item_number: number
+          match_confidence: number | null
+          material: string | null
+          model: string | null
+          name: string
+          notes: string | null
+          object_confidence: number | null
+          project_id: string
+          review_notes: string | null
+          review_status: string
+          subcategory: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          brand_confidence?: number | null
+          category: string
+          color?: string | null
+          condition?: string | null
+          created_at?: string
+          description?: string | null
+          distinctive_features?: string | null
+          id?: string
+          item_number: number
+          match_confidence?: number | null
+          material?: string | null
+          model?: string | null
+          name: string
+          notes?: string | null
+          object_confidence?: number | null
+          project_id: string
+          review_notes?: string | null
+          review_status?: string
+          subcategory?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          brand_confidence?: number | null
+          category?: string
+          color?: string | null
+          condition?: string | null
+          created_at?: string
+          description?: string | null
+          distinctive_features?: string | null
+          id?: string
+          item_number?: number
+          match_confidence?: number | null
+          material?: string | null
+          model?: string | null
+          name?: string
+          notes?: string | null
+          object_confidence?: number | null
+          project_id?: string
+          review_notes?: string | null
+          review_status?: string
+          subcategory?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_detections: {
+        Row: {
+          created_at: string
+          detection_id: string
+          id: string
+          inventory_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          detection_id: string
+          id?: string
+          inventory_item_id: string
+        }
+        Update: {
+          created_at?: string
+          detection_id?: string
+          id?: string
+          inventory_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_detections_detection_id_fkey"
+            columns: ["detection_id"]
+            isOneToOne: false
+            referencedRelation: "detections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_detections_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_images: {
+        Row: {
+          created_at: string
+          display_order: number
+          frame_id: string | null
+          id: string
+          image_url: string
+          inventory_item_id: string
+          quality_score: number | null
+          selected: boolean
+          timestamp: number | null
+          video_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          frame_id?: string | null
+          id?: string
+          image_url: string
+          inventory_item_id: string
+          quality_score?: number | null
+          selected?: boolean
+          timestamp?: number | null
+          video_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          frame_id?: string | null
+          id?: string
+          image_url?: string
+          inventory_item_id?: string
+          quality_score?: number | null
+          selected?: boolean
+          timestamp?: number | null
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_images_frame_id_fkey"
+            columns: ["frame_id"]
+            isOneToOne: false
+            referencedRelation: "video_frames"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_images_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_images_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ln_venues: {
         Row: {
@@ -1663,6 +1972,84 @@ export type Database = {
         }
         Relationships: []
       }
+      otw_artists: {
+        Row: {
+          album_buy_url: string | null
+          album_date: string | null
+          album_img: string | null
+          album_title: Json | null
+          audio_embed: string | null
+          bio: Json | null
+          created_at: string | null
+          from: Json | null
+          hero_buy_url: string | null
+          hero_img: string | null
+          id: string
+          name: Json | null
+          offer_msg: Json | null
+          on_tour: string | null
+          related_artist: Json | null
+          sharing_fb: string | null
+          sharing_twitter: string | null
+          slug: string | null
+          sort_order: string | null
+          status: string | null
+          tile_img: string | null
+          tm_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          album_buy_url?: string | null
+          album_date?: string | null
+          album_img?: string | null
+          album_title?: Json | null
+          audio_embed?: string | null
+          bio?: Json | null
+          created_at?: string | null
+          from?: Json | null
+          hero_buy_url?: string | null
+          hero_img?: string | null
+          id?: string
+          name?: Json | null
+          offer_msg?: Json | null
+          on_tour?: string | null
+          related_artist?: Json | null
+          sharing_fb?: string | null
+          sharing_twitter?: string | null
+          slug?: string | null
+          sort_order?: string | null
+          status?: string | null
+          tile_img?: string | null
+          tm_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          album_buy_url?: string | null
+          album_date?: string | null
+          album_img?: string | null
+          album_title?: Json | null
+          audio_embed?: string | null
+          bio?: Json | null
+          created_at?: string | null
+          from?: Json | null
+          hero_buy_url?: string | null
+          hero_img?: string | null
+          id?: string
+          name?: Json | null
+          offer_msg?: Json | null
+          on_tour?: string | null
+          related_artist?: Json | null
+          sharing_fb?: string | null
+          sharing_twitter?: string | null
+          slug?: string | null
+          sort_order?: string | null
+          status?: string | null
+          tile_img?: string | null
+          tm_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       payment_transactions: {
         Row: {
           amount: number
@@ -2026,6 +2413,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       saved_items: {
         Row: {
@@ -2834,23 +3245,45 @@ export type Database = {
       }
       ticketmaster_events: {
         Row: {
+          all_classifications: Json | null
           artist_id: string | null
           artist_image: string | null
           artist_name: string | null
           artist_videolink: string | null
           attraction_id: string
+          classification_family: boolean | null
+          classification_primary: boolean | null
           created_at: string | null
           event_date: string
           event_id: string
           event_name: string
           event_time: string | null
           event_url: string | null
+          genre_id: string | null
+          genre_name: string | null
           id: string
+          inventory_last_checked: string | null
+          inventory_status: string | null
+          inventory_status_detail: string | null
           is_active: boolean | null
+          price_currency: string | null
+          price_extends_beyond_max: boolean | null
+          price_max: number | null
+          price_min: number | null
           primary_attraction_image: string | null
           primary_event_image: string | null
           primary_venue_image: string | null
+          resale_status: string | null
+          resale_status_detail: string | null
           search_keyword: string | null
+          segment_id: string | null
+          segment_name: string | null
+          subgenre_id: string | null
+          subgenre_name: string | null
+          subtype_id: string | null
+          subtype_name: string | null
+          type_id: string | null
+          type_name: string | null
           updated_at: string | null
           venue_city: string | null
           venue_country: string | null
@@ -2858,23 +3291,45 @@ export type Database = {
           venue_state: string | null
         }
         Insert: {
+          all_classifications?: Json | null
           artist_id?: string | null
           artist_image?: string | null
           artist_name?: string | null
           artist_videolink?: string | null
           attraction_id: string
+          classification_family?: boolean | null
+          classification_primary?: boolean | null
           created_at?: string | null
           event_date: string
           event_id: string
           event_name: string
           event_time?: string | null
           event_url?: string | null
+          genre_id?: string | null
+          genre_name?: string | null
           id?: string
+          inventory_last_checked?: string | null
+          inventory_status?: string | null
+          inventory_status_detail?: string | null
           is_active?: boolean | null
+          price_currency?: string | null
+          price_extends_beyond_max?: boolean | null
+          price_max?: number | null
+          price_min?: number | null
           primary_attraction_image?: string | null
           primary_event_image?: string | null
           primary_venue_image?: string | null
+          resale_status?: string | null
+          resale_status_detail?: string | null
           search_keyword?: string | null
+          segment_id?: string | null
+          segment_name?: string | null
+          subgenre_id?: string | null
+          subgenre_name?: string | null
+          subtype_id?: string | null
+          subtype_name?: string | null
+          type_id?: string | null
+          type_name?: string | null
           updated_at?: string | null
           venue_city?: string | null
           venue_country?: string | null
@@ -2882,23 +3337,45 @@ export type Database = {
           venue_state?: string | null
         }
         Update: {
+          all_classifications?: Json | null
           artist_id?: string | null
           artist_image?: string | null
           artist_name?: string | null
           artist_videolink?: string | null
           attraction_id?: string
+          classification_family?: boolean | null
+          classification_primary?: boolean | null
           created_at?: string | null
           event_date?: string
           event_id?: string
           event_name?: string
           event_time?: string | null
           event_url?: string | null
+          genre_id?: string | null
+          genre_name?: string | null
           id?: string
+          inventory_last_checked?: string | null
+          inventory_status?: string | null
+          inventory_status_detail?: string | null
           is_active?: boolean | null
+          price_currency?: string | null
+          price_extends_beyond_max?: boolean | null
+          price_max?: number | null
+          price_min?: number | null
           primary_attraction_image?: string | null
           primary_event_image?: string | null
           primary_venue_image?: string | null
+          resale_status?: string | null
+          resale_status_detail?: string | null
           search_keyword?: string | null
+          segment_id?: string | null
+          segment_name?: string | null
+          subgenre_id?: string | null
+          subgenre_name?: string | null
+          subtype_id?: string | null
+          subtype_name?: string | null
+          type_id?: string | null
+          type_name?: string | null
           updated_at?: string | null
           venue_city?: string | null
           venue_country?: string | null
@@ -3028,6 +3505,88 @@ export type Database = {
           username?: string
         }
         Relationships: []
+      }
+      video_frames: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          metadata: Json | null
+          timestamp: number
+          video_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          metadata?: Json | null
+          timestamp: number
+          video_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          metadata?: Json | null
+          timestamp?: number
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_frames_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      videos: {
+        Row: {
+          created_at: string
+          duration: number | null
+          error_message: string | null
+          filename: string
+          id: string
+          processing_stage: string | null
+          processing_status: string
+          project_id: string
+          storage_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration?: number | null
+          error_message?: string | null
+          filename: string
+          id?: string
+          processing_stage?: string | null
+          processing_status?: string
+          project_id: string
+          storage_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration?: number | null
+          error_message?: string | null
+          filename?: string
+          id?: string
+          processing_stage?: string | null
+          processing_status?: string
+          project_id?: string
+          storage_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       waitlist: {
         Row: {

@@ -13,13 +13,13 @@ position: 6
 Shared family calendar page showing reminders, milestones, and events that any family member can add. Displays in calendar view with month/list toggle. Family members can add events through their AI agent chat or directly on the calendar page.
 
 ## Checklist
-- [ ] Create family_events table with RLS for family-wide visibility
-- [ ] Build calendar page with month view visualization
-- [ ] Add event creation form (title, date, type, description)
+- [x] Create family_events table with RLS for family-wide visibility
+- [x] Build calendar page with month view visualization
+- [x] Add event creation form (title, date, type, description)
 - [ ] Integrate with AI chat to parse and create events
-- [ ] Add list view toggle for upcoming events
-- [ ] Display who created each event
-- [ ] Add edit/delete functionality with creator restrictions
+- [x] Add list view toggle for upcoming events
+- [x] Display who created each event
+- [x] Add edit/delete functionality with creator restrictions
 
 ## Acceptance
 - All family members can see the shared calendar

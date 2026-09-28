@@ -4,7 +4,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Search, FolderPlus, LogOut, User, Bookmark } from "lucide-react";
+import { MessageSquare, Search, FolderPlus, LogOut, User, Bookmark, Calendar as CalendarIcon } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -193,6 +193,25 @@ export default function DashboardPage() {
               <Link href="/storage">
                 <Button variant="outline" className="w-full">
                   View All Items
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5 text-accent" />
+                Family Calendar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Shared calendar for family reminders, milestones, and events
+              </p>
+              <Link href="/calendar">
+                <Button variant="outline" className="w-full">
+                  View Calendar
                 </Button>
               </Link>
             </CardContent>
