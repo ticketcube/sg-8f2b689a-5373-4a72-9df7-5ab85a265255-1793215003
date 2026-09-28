@@ -16,7 +16,7 @@ Shared family calendar page showing reminders, milestones, and events that any f
 - [x] Create family_events table with RLS for family-wide visibility
 - [x] Build calendar page with month view visualization
 - [x] Add event creation form (title, date, type, description)
-- [ ] Integrate with AI chat to parse and create events
+- [x] Integrate with AI chat to parse and create events
 - [x] Add list view toggle for upcoming events
 - [x] Display who created each event
 - [x] Add edit/delete functionality with creator restrictions

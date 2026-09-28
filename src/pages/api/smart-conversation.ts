@@ -11,6 +11,20 @@ interface ConversationMessage {
   tool_calls?: any[];
 }
 
+interface Message {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+interface CalendarEventRequest {
+  title: string;
+  description?: string;
+  event_date: string;
+  event_type: "reminder" | "milestone" | "event" | "birthday" | "appointment" | "other";
+  all_day: boolean;
+  event_time?: string;
+}
+
 // Define available functions for OpenAI
 const tools = [
   {
