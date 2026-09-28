@@ -1,6 +1,6 @@
 ---
 title: Smart Search & Storage System
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [search, storage, database]
