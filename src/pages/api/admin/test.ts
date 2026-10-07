@@ -123,6 +123,58 @@ export default async function handler(
         });
       }
     }
+
+    if (test === 'brave-search') {
+      try {
+        const apiKey = process.env.BRAVE_SEARCH_API_KEY;
+        
+        if (!apiKey || apiKey === 'your_brave_api_key_here') {
+          return res.status(200).json({
+            success: false,
+            error: 'Brave Search API key not configured',
+            details: 'Set BRAVE_SEARCH_API_KEY in environment variables'
+          });
+        }
+
+        // Test with a simple query
+        const testQuery = 'test search';
+        const braveResponse = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(testQuery)}&count=1`,
+          {
+            headers: {
+              'Accept': 'application/json',
+              'Accept-Encoding': 'gzip',
+              'X-Subscription-Token': apiKey,
+            },
+          }
+        );
+
+        if (!braveResponse.ok) {
+          const errorText = await braveResponse.text();
+          return res.status(200).json({
+            success: false,
+            error: `Brave Search API returned ${braveResponse.status}`,
+            details: errorText,
+          });
+        }
+
+        const data = await braveResponse.json();
+        const resultsCount = data.web?.results?.length || 0;
+
+        return res.status(200).json({
+          success: true,
+          message: 'Brave Search API working',
+          resultsCount,
+          apiKeyPrefix: apiKey.substring(0, 8) + '...',
+        });
+      } catch (error: any) {
+        return res.status(200).json({
+          success: false,
+          error: 'Brave Search API Error',
+          details: error.message,
+        });
+      }
+    }
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

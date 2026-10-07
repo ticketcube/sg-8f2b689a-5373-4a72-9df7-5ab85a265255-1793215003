@@ -16,7 +16,8 @@ import {
   Loader2,
   LogOut,
   AlertCircle,
-  Activity
+  Activity,
+  Search
 } from 'lucide-react';
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ApiCostsTable } from "@/components/ApiCostsTable";
@@ -372,6 +373,54 @@ export default function AdminDashboard() {
                     </div>
                   )}
                 </div>
+
+                <Button 
+                  onClick={() => runTest('brave-search')}
+                  disabled={testing === 'brave-search'}
+                  className="w-full"
+                >
+                  {testing === 'brave-search' ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Brave Search...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Test Brave Search API
+                    </>
+                  )}
+                </Button>
+                {testResults['brave-search'] && (
+                  <div className={`mt-2 p-3 rounded-md text-sm ${
+                    testResults['brave-search'].success 
+                      ? 'bg-green-50 text-green-700 border border-green-200' 
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    {testResults['brave-search'].success ? (
+                      <>
+                        <p className="font-semibold flex items-center">
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          {testResults['brave-search'].message}
+                        </p>
+                        <p className="mt-1 text-xs">
+                          Results: {testResults['brave-search'].resultsCount} | 
+                          Key: {testResults['brave-search'].apiKeyPrefix}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold flex items-center">
+                          <XCircle className="mr-2 h-4 w-4" />
+                          {testResults['brave-search'].error}
+                        </p>
+                        {testResults['brave-search'].details && (
+                          <p className="mt-1 text-xs">{testResults['brave-search'].details}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </Card>
           </TabsContent>

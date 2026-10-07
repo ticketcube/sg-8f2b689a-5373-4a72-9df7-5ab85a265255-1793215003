@@ -697,6 +697,7 @@ CONVERSATION TYPES & WHEN TO USE FUNCTIONS:
 5. REAL-TIME INFORMATION - Use web_search() for current information
 
 WHEN TO USE WEB SEARCH:
+- Recipes, cooking instructions, ingredient substitutions
 - Weather queries (temperature, forecast, conditions)
 - Current news and events
 - Sports scores and schedules
@@ -705,6 +706,7 @@ WHEN TO USE WEB SEARCH:
 - Any real-time or current information you don't have
 - Facts you're uncertain about
 - Recent events after your knowledge cutoff
+- Medical/health information (symptoms, treatments, medications)
 
 FUNCTION CALLING RULES:
 - Call functions proactively as user mentions items/actions
