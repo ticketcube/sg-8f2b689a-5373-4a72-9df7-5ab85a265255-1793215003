@@ -4,7 +4,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Search, FolderPlus, LogOut, User, Bookmark, Calendar as CalendarIcon } from "lucide-react";
+import { MessageSquare, Calendar as CalendarIcon, LogOut, User, Plus, Clock, ChevronRight } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
 interface Profile {
   id: string;
@@ -12,16 +13,30 @@ interface Profile {
   full_name: string;
 }
 
+interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  event_date: string;
+  event_time: string | null;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [savedItemsCount, setSavedItemsCount] = useState(0);
-  const [recentItems, setRecentItems] = useState<any[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
+  const [recentConversations, setRecentConversations] = useState<Conversation[]>([]);
 
   useEffect(() => {
     checkAuth();
-    loadStats();
   }, []);
 
   const checkAuth = async () => {
@@ -40,29 +55,33 @@ export default function DashboardPage() {
 
     if (data) {
       setProfile(data);
+      await loadDashboardData(session.user.id);
     }
     setLoading(false);
   };
 
-  async function loadStats() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+  async function loadDashboardData(userId: string) {
+    // Load upcoming calendar events
+    const today = new Date().toISOString().split('T')[0];
+    const { data: events } = await supabase
+      .from("family_events")
+      .select("id, title, description, event_date, event_time")
+      .gte("event_date", today)
+      .order("event_date", { ascending: true })
+      .order("event_time", { ascending: true })
+      .limit(5);
 
-    const { count: itemsCount } = await supabase
-      .from("saved_items")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", session.user.id);
+    setUpcomingEvents(events || []);
 
-    setSavedItemsCount(itemsCount || 0);
+    // Load recent conversations
+    const { data: conversations } = await supabase
+      .from("conversations")
+      .select("id, title, created_at, updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(6);
 
-    const { data: items } = await supabase
-      .from("saved_items")
-      .select("id, title, created_at")
-      .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false })
-      .limit(3);
-
-    setRecentItems(items || []);
+    setRecentConversations(conversations || []);
   }
 
   const handleSignOut = async () => {
@@ -70,153 +89,193 @@ export default function DashboardPage() {
     router.push("/auth/login");
   };
 
+  const formatEventDate = (dateStr: string, timeStr: string | null) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const isToday = date.toDateString() === today.toDateString();
+    const isTomorrow = date.toDateString() === tomorrow.toDateString();
+
+    if (isToday) return timeStr ? `Today at ${timeStr}` : "Today";
+    if (isTomorrow) return timeStr ? `Tomorrow at ${timeStr}` : "Tomorrow";
+    
+    const dateFormat = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return timeStr ? `${dateFormat} at ${timeStr}` : dateFormat;
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      {/* Mobile-Optimized Header */}
+      <header className="sticky top-0 z-10 bg-white border-b shadow-sm">
+        <div className="px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="font-serif text-2xl text-primary">Personal AI Assistant</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Welcome back, {profile?.full_name || "there"}
+            <h1 className="font-serif text-lg font-bold text-primary">Family AI</h1>
+            <p className="text-xs text-muted-foreground">
+              {profile?.full_name || "Welcome"}
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <Link href="/profile">
-              <Button variant="outline" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                Profile
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <User className="h-4 w-4" />
               </Button>
             </Link>
-            <Button variant="outline" size="sm" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+            <Button variant="ghost" size="sm" onClick={handleSignOut} className="h-8 w-8 p-0">
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                <MessageSquare className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle className="font-serif">New Conversation</CardTitle>
-              <CardDescription>Start a chat with your AI assistant</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/chat">
-                <Button className="w-full">
-                  Start Chat
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+      <main className="px-4 py-4 pb-20 space-y-4 max-w-2xl mx-auto">
+        {/* Upcoming Events Section */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-accent" />
+              Upcoming
+            </h2>
+            <Link href="/calendar">
+              <Button variant="ghost" size="sm" className="text-xs">
+                View All
+                <ChevronRight className="h-3 w-3 ml-1" />
+              </Button>
+            </Link>
+          </div>
 
-          <Card className="hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center mb-4">
-                <Search className="h-6 w-6 text-accent" />
-              </div>
-              <CardTitle className="font-serif">Search Storage</CardTitle>
-              <CardDescription>Find information you've saved</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/storage">
-                <Button variant="outline" className="w-full">
-                  Search
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <div className="h-12 w-12 rounded-lg bg-secondary/10 flex items-center justify-center mb-4">
-                <FolderPlus className="h-6 w-6 text-secondary" />
-              </div>
-              <CardTitle className="font-serif">Save Item</CardTitle>
-              <CardDescription>Store important information</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/storage?new=true">
-                <Button variant="outline" className="w-full">
-                  Add Item
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-serif">Recent Conversations</CardTitle>
-              <CardDescription>Your latest chats</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No conversations yet. Start a new chat to begin.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-serif">Saved Items</CardTitle>
-              <CardDescription>Quick access to your storage</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4">
-                <p className="text-3xl font-bold text-foreground">{savedItemsCount}</p>
-                <p className="text-sm text-muted-foreground">Total items stored</p>
-              </div>
-              {recentItems.length > 0 && (
-                <div className="space-y-2 mb-4">
-                  <p className="text-sm font-medium">Recent:</p>
-                  {recentItems.map((item) => (
-                    <div key={item.id} className="text-sm text-muted-foreground truncate">
-                      • {item.title}
+          {upcomingEvents.length === 0 ? (
+            <Card className="bg-muted/30">
+              <CardContent className="py-8 text-center">
+                <CalendarIcon className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No upcoming events</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Ask your AI assistant to add reminders
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {upcomingEvents.map((event) => (
+                <Card key={event.id} className="border-l-4 border-l-accent">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-foreground truncate">
+                          {event.title}
+                        </p>
+                        {event.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {event.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatEventDate(event.event_date, event.event_time)}</span>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-              <Link href="/storage">
-                <Button variant="outline" className="w-full">
-                  View All Items
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-serif flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-accent" />
-                Family Calendar
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Shared calendar for family reminders, milestones, and events
-              </p>
-              <Link href="/calendar">
-                <Button variant="outline" className="w-full">
-                  View Calendar
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+        {/* New Conversation Button */}
+        <section className="py-2">
+          <Link href="/chat">
+            <Button className="w-full h-14 text-base font-semibold shadow-lg hover:shadow-xl transition-shadow">
+              <Plus className="h-5 w-5 mr-2" />
+              Start New Conversation
+            </Button>
+          </Link>
+        </section>
+
+        {/* Recent Conversations Section */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              Recent Chats
+            </h2>
+          </div>
+
+          {recentConversations.length === 0 ? (
+            <Card className="bg-muted/30">
+              <CardContent className="py-8 text-center">
+                <MessageSquare className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No conversations yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Start your first chat above
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {recentConversations.map((conversation) => (
+                <Link key={conversation.id} href={`/chat?id=${conversation.id}`}>
+                  <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-foreground truncate">
+                            {conversation.title || "Untitled Conversation"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDistanceToNow(new Date(conversation.updated_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Quick Actions */}
+        <section className="pt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/storage">
+              <Card className="hover:border-primary transition-colors cursor-pointer h-full">
+                <CardContent className="p-4 text-center">
+                  <div className="h-10 w-10 rounded-lg bg-secondary/10 flex items-center justify-center mx-auto mb-2">
+                    <svg className="h-5 w-5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  </div>
+                  <p className="text-xs font-medium text-foreground">Storage</p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/calendar">
+              <Card className="hover:border-accent transition-colors cursor-pointer h-full">
+                <CardContent className="p-4 text-center">
+                  <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center mx-auto mb-2">
+                    <CalendarIcon className="h-5 w-5 text-accent" />
+                  </div>
+                  <p className="text-xs font-medium text-foreground">Calendar</p>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </section>
       </main>
     </div>
   );
