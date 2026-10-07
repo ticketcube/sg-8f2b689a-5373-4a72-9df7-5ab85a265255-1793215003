@@ -616,7 +616,7 @@ Return ONLY the JSON object, no explanation.`
           const { error: calendarError } = await supabase
             .from("family_events")
             .insert({
-              user_id: session.user.id,
+              user_id: userId,
               title: eventDetails.title,
               description: eventDetails.description || null,
               event_date: eventDetails.event_date,
