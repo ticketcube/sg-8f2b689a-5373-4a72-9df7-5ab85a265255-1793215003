@@ -565,6 +565,76 @@ export default async function handler(
       return res.status(400).json({ error: "Message is required" });
     }
 
+    // Check if message is calendar-related
+    const calendarKeywords = ["remind", "reminder", "schedule", "appointment", "birthday", "milestone", "event", "calendar", "add to calendar"];
+    const isCalendarRequest = calendarKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
+
+    let calendarEventCreated = false;
+    let eventDetails: CalendarEventRequest | null = null;
+
+    if (isCalendarRequest) {
+      // Ask AI to extract calendar event details
+      try {
+        const extractionResponse = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: `You are a calendar event extraction assistant. Extract event details from user messages and return ONLY a valid JSON object with these fields:
+{
+  "isCalendarEvent": true/false,
+  "title": "event title",
+  "description": "optional description",
+  "event_date": "YYYY-MM-DD format",
+  "event_type": "reminder|milestone|event|birthday|appointment|other",
+  "all_day": true/false,
+  "event_time": "HH:MM format if not all_day, otherwise null"
+}
+
+Current date: ${new Date().toISOString().split("T")[0]}
+
+If the message is not asking to create/schedule/remind about something, return {"isCalendarEvent": false}. 
+If dates are relative (tomorrow, next week, etc.), calculate the actual date.
+Return ONLY the JSON object, no explanation.`
+            },
+            {
+              role: "user",
+              content: message
+            }
+          ],
+          temperature: 0.3
+        });
+
+        const extractedData = JSON.parse(extractionResponse.choices[0].message.content || "{}");
+
+        if (extractedData.isCalendarEvent) {
+          eventDetails = extractedData;
+
+          // Create the calendar event in Supabase
+          const { error: calendarError } = await supabase
+            .from("family_events")
+            .insert({
+              user_id: session.user.id,
+              title: eventDetails.title,
+              description: eventDetails.description || null,
+              event_date: eventDetails.event_date,
+              event_type: eventDetails.event_type,
+              all_day: eventDetails.all_day,
+              event_time: eventDetails.event_time || null
+            });
+
+          if (!calendarError) {
+            calendarEventCreated = true;
+          }
+        }
+      } catch (e) {
+        console.error("Calendar extraction error:", e);
+        // Continue with normal chat even if calendar extraction fails
+      }
+    }
+
     // Handle resume conversation with context
     if (message === "__RESUME_CONVERSATION__" && incomingConversationId) {
       // Load saved items associated with this conversation
