@@ -44,6 +44,14 @@ export default function ChatPage() {
     }
   }, [user]);
 
+  // Load conversation from URL query parameter
+  useEffect(() => {
+    const { id } = router.query;
+    if (id && typeof id === 'string' && conversations.length > 0) {
+      loadConversation(id);
+    }
+  }, [router.query, conversations]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
