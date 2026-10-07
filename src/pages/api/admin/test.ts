@@ -92,19 +92,23 @@ export default async function handler(
 
     if (test === 'database-tables') {
       try {
-        // Check which tables exist
-        const tables = ['conversations', 'system_settings', 'user_profiles'];
+        // Check which tables exist - use correct primary key columns
+        const tableChecks = [
+          { name: 'conversations', pkColumn: 'id' },
+          { name: 'system_settings', pkColumn: 'key' },
+          { name: 'user_profiles', pkColumn: 'user_id' }
+        ];
         const results: Record<string, boolean> = {};
 
-        for (const table of tables) {
+        for (const table of tableChecks) {
           try {
             const { error } = await supabaseAdmin
-              .from(table)
-              .select('id')
+              .from(table.name)
+              .select(table.pkColumn)
               .limit(1);
-            results[table] = !error;
+            results[table.name] = !error;
           } catch {
-            results[table] = false;
+            results[table.name] = false;
           }
         }
 
