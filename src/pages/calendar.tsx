@@ -60,13 +60,14 @@ export default function CalendarPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("family_events")
-      .select(`
-        *,
-        creator:user_profiles!family_events_user_id_fkey(email, display_name)
-      `)
+      .select("*")
       .order("event_date", { ascending: true });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Error loading events:", error);
+    }
+
+    if (data) {
       setEvents(data as any);
     }
     setLoading(false);
@@ -410,9 +411,6 @@ export default function CalendarPage() {
                         {event.description && (
                           <p className="text-sm text-foreground mb-2">{event.description}</p>
                         )}
-                        <p className="text-xs text-muted-foreground">
-                          Created by {event.creator?.display_name || event.creator?.email || "Unknown"}
-                        </p>
                       </div>
                       <div className="flex gap-2">
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(event)}>
