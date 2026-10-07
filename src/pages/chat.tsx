@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { MessageSquare, Send, Plus, Trash2, LogOut, Bookmark } from "lucide-react";
+import { MessageSquare, Send, Plus, Trash2, LogOut, Bookmark, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { speak } from "@/lib/tts";
 
 interface Message {
   role: "user" | "assistant";
@@ -34,6 +35,13 @@ export default function ChatPage() {
   const [isSaving, setIsSaving] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
   useEffect(() => {
     checkUser();
   }, []);
@@ -44,10 +52,9 @@ export default function ChatPage() {
     }
   }, [user]);
 
-  // Load conversation from URL query parameter
   useEffect(() => {
     const { id } = router.query;
-    if (id && typeof id === 'string' && conversations.length > 0) {
+    if (id && typeof id === "string" && conversations.length > 0) {
       loadConversation(id);
     }
   }, [router.query, conversations]);
@@ -143,12 +150,13 @@ export default function ChatPage() {
     }
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || sending || !currentConversationId) return;
+  const sendMessage = async (messageText?: string) => {
+    const textToSend = messageText || input.trim();
+    if (!textToSend || sending || !currentConversationId) return;
 
     const userMessage: Message = {
       role: "user",
-      content: input.trim()
+      content: textToSend
     };
 
     const updatedMessages = [...messages, userMessage];
@@ -157,7 +165,6 @@ export default function ChatPage() {
     setSending(true);
 
     try {
-      // Get current session for auth token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("Not authenticated");
@@ -170,7 +177,7 @@ export default function ChatPage() {
           "Authorization": `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          message: input.trim(),
+          message: textToSend,
           conversationMessages: messages,
           conversationId: currentConversationId
         })
@@ -194,12 +201,16 @@ export default function ChatPage() {
         .from("conversations")
         .update({
           messages: finalMessages,
-          title: messages.length === 0 ? input.trim().slice(0, 50) : undefined,
+          title: messages.length === 0 ? textToSend.slice(0, 50) : undefined,
           updated_at: new Date().toISOString()
         })
         .eq("id", currentConversationId);
 
       loadConversations();
+
+      if (voiceMode) {
+        await speakResponse(data.response, session.access_token);
+      }
     } catch (error) {
       console.error("Error sending message:", error);
       const errorMessage: Message = {
@@ -211,6 +222,109 @@ export default function ChatPage() {
       setSending(false);
     }
   };
+
+  async function speakResponse(text: string, accessToken: string) {
+    if (isSpeaking) {
+      stopSpeaking();
+    }
+
+    try {
+      setIsSpeaking(true);
+      const audio = await speak(text, accessToken, {
+        provider: "openai",
+        voice: "nova",
+        speed: 1.0,
+      });
+
+      if (audio instanceof HTMLAudioElement) {
+        currentAudioRef.current = audio;
+        audio.onended = () => setIsSpeaking(false);
+        await audio.play();
+      }
+    } catch (error) {
+      console.error("TTS Error:", error);
+      setIsSpeaking(false);
+    }
+  }
+
+  function stopSpeaking() {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+    setIsSpeaking(false);
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        await transcribeAudio(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      alert("Microphone access denied or not available");
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  }
+
+  async function transcribeAudio(audioBlob: Blob) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const formData = new FormData();
+      formData.append("audio", audioBlob);
+
+      const response = await fetch("/api/speech-to-text", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to transcribe audio");
+      }
+
+      const data = await response.json();
+      await sendMessage(data.text);
+    } catch (error) {
+      console.error("Transcription error:", error);
+      alert("Failed to transcribe audio. Please try again.");
+    }
+  }
+
+  function toggleVoiceMode() {
+    if (voiceMode) {
+      stopSpeaking();
+      if (isRecording) stopRecording();
+    }
+    setVoiceMode(!voiceMode);
+  }
 
   async function handleSaveMessage(message: any) {
     if (!message.content || isSaving) return;
@@ -264,7 +378,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar */}
       <div className="w-80 border-r border-border bg-muted/30 flex flex-col">
         <div className="p-6 border-b border-border">
           <h1 className="text-2xl font-serif font-semibold text-foreground mb-4">
@@ -336,13 +449,12 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {currentConversationId ? (
           <>
             <ScrollArea className="flex-1 p-6">
               <div className="max-w-3xl mx-auto space-y-6">
-                {messages.length === 0 ? (
+                {messages.length === 0 && !voiceMode ? (
                   <div className="text-center py-12">
                     <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                     <h2 className="text-xl font-serif font-semibold text-foreground mb-2">
@@ -350,6 +462,35 @@ export default function ChatPage() {
                     </h2>
                     <p className="text-muted-foreground">
                       Start a conversation with your personal AI assistant
+                    </p>
+                  </div>
+                ) : messages.length === 0 && voiceMode ? (
+                  <div className="text-center py-12">
+                    <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-6 ${
+                      isRecording 
+                        ? "bg-red-500 animate-pulse" 
+                        : isSpeaking 
+                        ? "bg-accent animate-pulse"
+                        : "bg-muted"
+                    }`}>
+                      {isRecording ? (
+                        <Mic className="w-12 h-12 text-white" />
+                      ) : isSpeaking ? (
+                        <Volume2 className="w-12 h-12 text-white" />
+                      ) : (
+                        <Mic className="w-12 h-12 text-muted-foreground" />
+                      )}
+                    </div>
+                    <h2 className="text-xl font-serif font-semibold text-foreground mb-2">
+                      {isRecording ? "Listening..." : isSpeaking ? "Speaking..." : "Voice Mode Active"}
+                    </h2>
+                    <p className="text-muted-foreground mb-6">
+                      {isRecording 
+                        ? "Speak now, then click the button to stop"
+                        : isSpeaking
+                        ? "Agent is responding..."
+                        : "Click the red button to start speaking"
+                      }
                     </p>
                   </div>
                 ) : (
@@ -395,24 +536,75 @@ export default function ChatPage() {
 
             <div className="p-6 bg-muted/30">
               <div className="max-w-3xl mx-auto">
-                <div className="flex gap-3">
-                  <Textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your message... (Shift+Enter for new line)"
-                    className="flex-1 min-h-[60px] max-h-[200px] resize-none"
-                    disabled={sending}
-                  />
+                <div className="flex items-center gap-3 mb-4">
                   <Button
-                    onClick={sendMessage}
-                    disabled={!input.trim() || sending}
-                    size="lg"
-                    className="h-[60px] px-6"
+                    onClick={toggleVoiceMode}
+                    variant={voiceMode ? "default" : "outline"}
+                    size="sm"
                   >
-                    <Send className="w-5 h-5" />
+                    {voiceMode ? (
+                      <>
+                        <VolumeX className="w-4 h-4 mr-2" />
+                        Exit Voice Mode
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-4 h-4 mr-2" />
+                        Voice Mode
+                      </>
+                    )}
                   </Button>
+                  {voiceMode && isSpeaking && (
+                    <Button
+                      onClick={stopSpeaking}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <VolumeX className="w-4 h-4 mr-2" />
+                      Stop Speaking
+                    </Button>
+                  )}
                 </div>
+
+                {voiceMode ? (
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={sending || isSpeaking}
+                      size="lg"
+                      className={`h-24 w-24 rounded-full ${
+                        isRecording 
+                          ? "bg-red-500 hover:bg-red-600 animate-pulse" 
+                          : "bg-red-500 hover:bg-red-600"
+                      }`}
+                    >
+                      {isRecording ? (
+                        <MicOff className="w-10 h-10 text-white" />
+                      ) : (
+                        <Mic className="w-10 h-10 text-white" />
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type your message... (Shift+Enter for new line)"
+                      className="flex-1 min-h-[60px] max-h-[200px] resize-none"
+                      disabled={sending}
+                    />
+                    <Button
+                      onClick={() => sendMessage()}
+                      disabled={!input.trim() || sending}
+                      size="lg"
+                      className="h-[60px] px-6"
+                    >
+                      <Send className="w-5 h-5" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </>
