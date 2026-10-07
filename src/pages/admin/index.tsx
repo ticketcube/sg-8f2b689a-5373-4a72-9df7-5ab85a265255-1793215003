@@ -30,6 +30,8 @@ interface TestResult {
   response?: string;
   model?: string;
   tables?: Record<string, boolean>;
+  resultsCount?: number;
+  apiKeyPrefix?: string;
 }
 
 export default function AdminDashboard() {
