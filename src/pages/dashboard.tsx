@@ -196,7 +196,7 @@ export default function DashboardPage() {
 
         {/* New Conversation Button */}
         <section className="py-2">
-          <Link href="/chat">
+          <Link href="/chat-simple">
             <Button className="w-full h-14 text-base font-semibold shadow-lg hover:shadow-xl transition-shadow">
               <Plus className="h-5 w-5 mr-2" />
               Start New Conversation
