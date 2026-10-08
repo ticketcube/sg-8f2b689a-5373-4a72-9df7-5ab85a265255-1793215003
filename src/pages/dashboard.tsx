@@ -4,7 +4,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Calendar as CalendarIcon, LogOut, User, Plus, Clock, ChevronRight } from "lucide-react";
+import { MessageSquare, Calendar as CalendarIcon, LogOut, User, Plus, Clock, ChevronRight, Bookmark } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface Profile {
@@ -249,30 +249,41 @@ export default function DashboardPage() {
         </section>
 
         {/* Quick Actions */}
-        <section className="pt-4">
+        <section className="mb-6">
           <div className="grid grid-cols-2 gap-3">
-            <Link href="/storage">
-              <Card className="hover:border-primary transition-colors cursor-pointer h-full">
-                <CardContent className="p-4 text-center">
-                  <div className="h-10 w-10 rounded-lg bg-secondary/10 flex items-center justify-center mx-auto mb-2">
-                    <svg className="h-5 w-5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                    </svg>
+            <Link href="/chat-simple">
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors border-primary/20 hover:border-primary/40">
+                <CardContent className="p-4 flex flex-col items-center text-center">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                    <MessageSquare className="w-6 h-6 text-primary" />
                   </div>
-                  <p className="text-xs font-medium text-foreground">Storage</p>
+                  <span className="text-sm font-medium">New Chat</span>
                 </CardContent>
               </Card>
             </Link>
-
-            <Link href="/calendar">
-              <Card className="hover:border-accent transition-colors cursor-pointer h-full">
-                <CardContent className="p-4 text-center">
-                  <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center mx-auto mb-2">
-                    <CalendarIcon className="h-5 w-5 text-accent" />
+            <Link href="/storage">
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardContent className="p-4 flex flex-col items-center text-center">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                    <Bookmark className="w-6 h-6 text-primary" />
                   </div>
-                  <p className="text-xs font-medium text-foreground">Calendar</p>
+                  <span className="text-sm font-medium">My Storage</span>
                 </CardContent>
               </Card>
+            </Link>
+          </div>
+        </section>
+
+        {/* Upcoming Projects (Family Calendar) */}
+        <section className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-serif font-semibold text-foreground">
+              Upcoming Projects
+            </h2>
+            <Link href="/calendar">
+              <Button variant="ghost" size="sm">
+                View All
+              </Button>
             </Link>
           </div>
         </section>
