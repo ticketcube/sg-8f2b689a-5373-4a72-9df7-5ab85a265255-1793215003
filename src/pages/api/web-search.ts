@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
+import { getAuthenticatedUser } from "@/lib/supabase-server";
 
 interface BraveSearchResult {
   title: string;
@@ -24,6 +25,23 @@ export default async function handler(
   }
 
   try {
+    // Authenticate user - web search should only be available to authenticated users
+    let userId: string | undefined;
+    try {
+      const { user } = await getAuthenticatedUser(req);
+      userId = user.id;
+      console.log("🔐 WEB_SEARCH_AUTH: User authenticated:", userId);
+    } catch (authError) {
+      // Allow internal API calls (from smart-conversation.ts) without auth
+      // These will come from the same server, not from external clients
+      const isInternalCall = req.headers['x-internal-call'] === 'true';
+      if (!isInternalCall) {
+        console.log("❌ WEB_SEARCH_AUTH: Authentication failed");
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      console.log("🔓 WEB_SEARCH_AUTH: Internal API call, bypassing auth");
+    }
+
     const { query, count = 3 } = req.body;
 
     if (!query) {

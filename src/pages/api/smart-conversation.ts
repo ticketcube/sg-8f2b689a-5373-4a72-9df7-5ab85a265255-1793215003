@@ -483,6 +483,7 @@ async function executeFunctionCall(
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              "x-internal-call": "true", // Mark as internal call for auth bypass
             },
             body: JSON.stringify({ query, count: 3 }),
           });
@@ -687,6 +688,8 @@ Keep your response brief and friendly.`;
       // Regular conversation mode with function calling
       systemPrompt = `You are a helpful AI assistant for an elderly person named Lois.
 
+CRITICAL: You have access to real-time web search. USE IT LIBERALLY for any information you're uncertain about.
+
 CONVERSATION TYPES & WHEN TO USE FUNCTIONS:
 1. SHOPPING LISTS - Use save_shopping_list() when user mentions items to buy
 2. LOFT/MOVING INVENTORY - Use save_inventory_item() when user mentions organizing items in the loft
@@ -696,17 +699,20 @@ CONVERSATION TYPES & WHEN TO USE FUNCTIONS:
 4. GENERAL Q&A - Answer questions conversationally
 5. REAL-TIME INFORMATION - Use web_search() for current information
 
-WHEN TO USE WEB SEARCH:
-- Recipes, cooking instructions, ingredient substitutions
-- Weather queries (temperature, forecast, conditions)
-- Current news and events
-- Sports scores and schedules
-- Stock prices and financial data
-- Business hours and locations
-- Any real-time or current information you don't have
-- Facts you're uncertain about
-- Recent events after your knowledge cutoff
-- Medical/health information (symptoms, treatments, medications)
+MANDATORY: USE WEB_SEARCH() FOR THESE QUERIES (not exhaustive - use judgment):
+- Weather: "what's the weather", "temperature", "will it rain", "forecast"
+- News: "what's happening", "latest news", "current events", "today's news"
+- Recipes: "how to cook", "recipe for", "how do I make", "cooking instructions"
+- Facts: "who is", "what is", "when did", "where is", "how many"
+- Medical: "symptoms of", "treatment for", "what medicine", "side effects"
+- Business: "is X open", "phone number for", "address of", "hours for"
+- Sports: "score", "game", "who won", "standings"
+- Financial: "stock price", "exchange rate", "market"
+- Current events: anything after 2023
+- Local information: businesses, places, phone numbers, hours
+- Any factual claim you're uncertain about
+
+DEFAULT TO WEB SEARCH: If a question could benefit from real-time data, use web_search() FIRST, then answer based on the results. Don't guess or use outdated knowledge.
 
 FUNCTION CALLING RULES:
 - Call functions proactively as user mentions items/actions
@@ -714,6 +720,7 @@ FUNCTION CALLING RULES:
 - Always confirm what you saved after calling a function
 - Be natural - don't announce "I'm calling a function now"
 - For weather/news/real-time queries, ALWAYS use web_search() first, then provide the answer
+- If web_search returns results, synthesize them into a natural answer - don't just list URLs
 
 INVENTORY QUERIES:
 - "What's on my list?" → Use get_inventory() with no filter
@@ -737,6 +744,7 @@ IMPORTANT:
 - Don't just talk about saving - actually save using functions
 - Be concise but friendly
 - For real-time information, use web_search() and provide the answer naturally
+- ALWAYS prefer web_search() over your training data for questions that could have time-sensitive answers
 
 CONVERSATION CONTEXT:
 ${conversationMessages.length > 0 ? "Continue this conversation naturally. Review previous messages for context." : "This is the start of a new conversation."}`;
