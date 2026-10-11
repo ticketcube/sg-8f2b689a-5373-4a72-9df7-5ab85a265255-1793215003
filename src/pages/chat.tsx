@@ -81,7 +81,6 @@ export default function ChatPage() {
     const { data, error } = await supabase
       .from("conversations")
       .select("*")
-      .eq("type", "general")
       .order("updated_at", { ascending: false });
 
     if (error) {
@@ -111,7 +110,7 @@ export default function ChatPage() {
         title: "New Conversation",
         messages: [],
         type: "general",
-        status: "saved"
+        status: "active"
       })
       .select()
       .single();
