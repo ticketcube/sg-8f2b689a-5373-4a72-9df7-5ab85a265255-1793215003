@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { getAuthenticatedUser } from "@/lib/supabase-server";
 import { logApiUsage } from "@/lib/api-cost-tracker";
+import { performWebSearch } from "@/lib/web-search";
 
 interface ConversationMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -475,29 +476,8 @@ async function executeFunctionCall(
         console.log("🟦 FUNCTION_EXEC: web_search with query =", query);
 
         try {
-          // Call the actual web-search API endpoint using relative path
-          const baseUrl = process.env.VERCEL_URL 
-            ? `https://${process.env.VERCEL_URL}` 
-            : 'http://localhost:3000';
-          
-          const searchResponse = await fetch(`${baseUrl}/api/web-search`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              // CRITICAL: Pass through the Authorization header from the original request
-              // so web-search can authenticate the user
-              ...(req.headers.authorization ? { "Authorization": req.headers.authorization } : {}),
-            },
-            body: JSON.stringify({ query, count: 3 }),
-          });
-
-          if (!searchResponse.ok) {
-            const errorData = await searchResponse.json().catch(() => ({}));
-            console.error("🔴 WEB_SEARCH_API_ERROR:", searchResponse.status, errorData);
-            throw new Error(`Web search failed: ${searchResponse.status} - ${errorData.error || 'Unknown error'}`);
-          }
-
-          const searchData = await searchResponse.json();
+          // Call shared web search function directly (no HTTP request)
+          const searchData = await performWebSearch(query, userId, 3);
           
           console.log("🟦 FUNCTION_RESULT: Found", searchData.results?.length || 0, "results", searchData.cached ? "(cached)" : "(live)");
           
