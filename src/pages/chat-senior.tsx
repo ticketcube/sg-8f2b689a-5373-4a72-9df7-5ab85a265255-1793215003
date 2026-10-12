@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, Send, Volume2, VolumeX, Menu, UserCircle } from "lucide-react";
+import { Menu, UserCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { VoiceControls } from "@/components/VoiceControls";
 
 interface Message {
   id: string;
@@ -24,6 +25,7 @@ export default function SeniorChat() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [lastResponse, setLastResponse] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -76,11 +78,10 @@ export default function SeniorChat() {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, assistantMessage]);
+        setLastResponse(data.response);
 
-        // Auto-speak response if voice is enabled
-        if (isSpeaking) {
-          speakText(data.response);
-        }
+        // Auto-speak response
+        speakText(data.response);
       }
     } catch (error) {
       toast({
@@ -103,6 +104,8 @@ export default function SeniorChat() {
       return;
     }
 
+    if (isRecording) return;
+
     const recognition = new (window as any).webkitSpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -111,10 +114,56 @@ export default function SeniorChat() {
       setIsRecording(true);
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = async (event: any) => {
       const transcript = event.results[0][0].transcript;
-      setInput(transcript);
       setIsRecording(false);
+      
+      // Immediately send the transcribed message
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: transcript,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setIsLoading(true);
+
+      try {
+        const response = await fetch("/api/smart-conversation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: transcript,
+            conversationHistory: messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.response) {
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: data.response,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, assistantMessage]);
+          setLastResponse(data.response);
+          speakText(data.response);
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to get response. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     recognition.onerror = () => {
@@ -131,6 +180,45 @@ export default function SeniorChat() {
     };
 
     recognition.start();
+  };
+
+  const handleStop = () => {
+    if (isRecording) {
+      window.speechSynthesis.cancel();
+    }
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+    }
+    setIsRecording(false);
+    setIsSpeaking(false);
+  };
+
+  const handleHearAgain = () => {
+    if (lastResponse) {
+      speakText(lastResponse);
+    } else {
+      toast({
+        title: "No Response",
+        description: "There's no response to replay yet.",
+      });
+    }
+  };
+
+  const handleEndThread = () => {
+    window.speechSynthesis.cancel();
+    setMessages([
+      {
+        id: "1",
+        role: "assistant",
+        content: "Hello! I'm your AI assistant. How can I help you today?",
+        timestamp: new Date(),
+      },
+    ]);
+    setLastResponse("");
+    toast({
+      title: "Conversation Ended",
+      description: "Starting a fresh conversation.",
+    });
   };
 
   const speakText = (text: string) => {
@@ -208,62 +296,14 @@ export default function SeniorChat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="bg-white border-t-4 border-gray-200 px-6 py-6">
-        <div className="flex gap-4 items-center mb-4">
-          <Button
-            variant={isSpeaking ? "default" : "outline"}
-            size="lg"
-            onClick={toggleSpeech}
-            className="p-6 rounded-2xl"
-          >
-            {isSpeaking ? (
-              <Volume2 className="w-8 h-8" />
-            ) : (
-              <VolumeX className="w-8 h-8" />
-            )}
-          </Button>
-          <span className="text-xl text-gray-600">
-            {isSpeaking ? "Voice On" : "Voice Off"}
-          </span>
-        </div>
-
-        <div className="flex gap-4">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Type your message..."
-            className="flex-1 px-8 py-6 text-2xl rounded-3xl border-3 border-gray-300 focus:border-blue-500 focus:outline-none bg-gray-50"
-            disabled={isLoading}
-          />
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={handleVoiceInput}
-            disabled={isRecording || isLoading}
-            className={`p-6 rounded-2xl border-3 ${
-              isRecording ? "bg-red-100 border-red-500" : "border-gray-300"
-            }`}
-          >
-            <Mic
-              className={`w-8 h-8 ${isRecording ? "text-red-500" : "text-gray-700"}`}
-            />
-          </Button>
-          <Button
-            size="lg"
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className="px-10 py-6 rounded-2xl text-xl bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-          >
-            <Send className="w-8 h-8" />
-          </Button>
-        </div>
-
-        <p className="text-center text-gray-500 text-lg mt-4">
-          Tap the microphone to speak or type your message
-        </p>
+      {/* Input Area - Replaced with VoiceControls */}
+      <div className="bg-white border-t-4 border-gray-200">
+        <VoiceControls
+          onStart={handleVoiceInput}
+          onStop={handleStop}
+          onHearAgain={handleHearAgain}
+          onEndThread={handleEndThread}
+        />
       </div>
     </div>
   );
