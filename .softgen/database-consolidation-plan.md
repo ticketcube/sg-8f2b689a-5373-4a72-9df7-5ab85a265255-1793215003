@@ -1,60 +1,53 @@
-# Database Consolidation Plan: user_profiles → profiles
+# Database Consolidation Plan: profiles → user_profiles
 
-## ✅ CODE MIGRATION COMPLETE
+## Goal
+Consolidate to `user_profiles` as the single source of truth for user data.
 
-All application code has been successfully migrated to use the `profiles` table exclusively:
+## Current State
 
-### Backend API (All Using `profiles`)
-- `src/pages/api/smart-conversation.ts` - Checks `profiles.role` for aiassist access
-- `src/pages/api/web-search.ts` - Checks `profiles.role` for aiassist access
-- `src/lib/supabase-admin.ts` - Checks `profiles.is_admin` for admin functions
+### Code Currently Using `profiles`
+**Backend API:**
+- `src/pages/api/smart-conversation.ts` (line 483): Checks `profiles.role`
+- `src/pages/api/web-search.ts` (line 49): Checks `profiles.role`
+- `src/lib/supabase-admin.ts` (line 33): Checks `profiles.is_admin`
 
-### Frontend UI (All Using `profiles`)
-- `src/pages/auth/signup.tsx` - Inserts new users into `profiles`
-- `src/pages/dashboard.tsx` - Queries `profiles` for user data
-- `src/pages/profile.tsx` - Queries `profiles` for settings
-- `src/pages/storage.tsx` - Queries `profiles` for user info
+**Frontend UI:**
+- `src/pages/auth/signup.tsx` (line 53): Inserts into `profiles`
+- `src/pages/dashboard.tsx` (line 41): Queries `profiles`
+- `src/pages/profile.tsx` (line 40): Queries `profiles`
+- `src/pages/storage.tsx` (line 60): Queries `profiles`
 
-### Fields Currently Used
-- `id` (primary key)
-- `email`
-- `full_name`
-- `role` (aiassist/admin access)
-- `is_admin` (admin flag)
+## Migration Plan
 
-## ⚠️ DATABASE CLEANUP NEEDED
+### Phase 1: Database Migration (SQL)
+1. Ensure `user_profiles` has all necessary columns
+2. Migrate data from `profiles` to `user_profiles`
+3. Update foreign key constraints (currently point to `profiles.id` → change to `user_profiles.user_id`)
+4. Drop `profiles` table
 
-The `user_profiles` table still exists in the database but is **no longer referenced by any code**.
+### Phase 2: Code Migration (TypeScript)
+Update all code references from `profiles` to `user_profiles`:
 
-### Cleanup Steps (SQL Migration Created)
+**Key Changes:**
+- Primary key field: `id` → `user_id`
+- Table name: `profiles` → `user_profiles`
 
-A migration file has been created: `supabase/migrations/20261012201500_drop_user_profiles.sql`
+**Files to Update:**
+1. `src/pages/api/smart-conversation.ts` - Change `profiles` → `user_profiles`, `id` → `user_id`
+2. `src/pages/api/web-search.ts` - Change `profiles` → `user_profiles`, `id` → `user_id`
+3. `src/lib/supabase-admin.ts` - Change `profiles` → `user_profiles`, `id` → `user_id`
+4. `src/pages/auth/signup.tsx` - Change `profiles` → `user_profiles`, `id` → `user_id`
+5. `src/pages/dashboard.tsx` - Change `profiles` → `user_profiles`, `id` → `user_id`
+6. `src/pages/profile.tsx` - Change `profiles` → `user_profiles`, `id` → `user_id`
+7. `src/pages/storage.tsx` - Change `profiles` → `user_profiles`, `id` → `user_id`
 
-**What it does:**
-1. ✅ Verifies no data loss (checks for users in user_profiles not in profiles)
-2. ✅ Updates foreign key constraints to point to profiles.id
-3. ✅ Updates RLS policies (where applicable)
-4. ✅ Drops the user_profiles table
-5. ✅ Adds documentation comment
+### Phase 3: Verification
+1. Regenerate Supabase types: `npx supabase gen types typescript`
+2. Run build to catch any TypeScript errors
+3. Test all features (signup, profile, dashboard, AI chat)
 
-**Tables with Updated Foreign Keys:**
-- minting_transactions (buyer_user_id, artist_user_id)
-- cube_update_notifications (holder_user_id, artist_user_id)
-- tcube_transactions (user_id)
-- tcube_stakes (user_id)
-- tcube_rewards (user_id)
-- cube_face_unlocks (user_id)
-
-### To Execute
-
-1. Review the migration SQL file
-2. Run via Supabase CLI or Dashboard SQL Editor
-3. Regenerate types: `npx supabase gen types typescript`
-4. Verify application still works correctly
-
-## Benefits Achieved
-✅ Single source of truth for user data  
-✅ Consistent data model  
-✅ Simpler foreign key references  
-✅ No split-brain architecture  
-✅ Easier maintenance
+## Benefits
+✅ Single source of truth (`user_profiles`)  
+✅ Consistent naming convention (`user_id` as FK)  
+✅ All existing foreign key relationships preserved  
+✅ No split-brain architecture
