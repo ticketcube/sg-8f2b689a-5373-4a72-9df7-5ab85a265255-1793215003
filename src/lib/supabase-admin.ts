@@ -28,7 +28,7 @@ export interface AdminUser {
 export async function isUserAdmin(userId: string): Promise<boolean> {
   try {
     const { data, error } = await supabaseAdmin
-      .from('user_profiles')
+      .from('profiles')
       .select('is_admin')
       .eq('user_id', userId)
       .single();

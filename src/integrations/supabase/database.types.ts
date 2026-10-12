@@ -2265,30 +2265,69 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           email: string | null
+          fandragon_id: string | null
           full_name: string | null
+          has_used_trial: boolean | null
           id: string
+          is_admin: boolean | null
           member_cat: string | null
+          role: string | null
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          stripe_subscription_status: string | null
+          subscription_ends_at: string | null
+          subscription_started_at: string | null
+          sui_wallet_address: string | null
+          tcube_balance: number | null
           updated_at: string | null
+          username: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
           email?: string | null
+          fandragon_id?: string | null
           full_name?: string | null
+          has_used_trial?: boolean | null
           id: string
+          is_admin?: boolean | null
           member_cat?: string | null
+          role?: string | null
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          stripe_subscription_status?: string | null
+          subscription_ends_at?: string | null
+          subscription_started_at?: string | null
+          sui_wallet_address?: string | null
+          tcube_balance?: number | null
           updated_at?: string | null
+          username?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
           display_name?: string | null
           email?: string | null
+          fandragon_id?: string | null
           full_name?: string | null
+          has_used_trial?: boolean | null
           id?: string
+          is_admin?: boolean | null
           member_cat?: string | null
+          role?: string | null
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          stripe_subscription_status?: string | null
+          subscription_ends_at?: string | null
+          subscription_started_at?: string | null
+          sui_wallet_address?: string | null
+          tcube_balance?: number | null
           updated_at?: string | null
+          username?: string | null
         }
         Relationships: []
       }

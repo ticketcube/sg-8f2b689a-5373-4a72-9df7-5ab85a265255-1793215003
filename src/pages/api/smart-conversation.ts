@@ -556,7 +556,7 @@ export default async function handler(
 
     // Check if user has 'aiassist' role
     const { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
+      .from("profiles")
       .select("role")
       .eq("user_id", userId)
       .single();
