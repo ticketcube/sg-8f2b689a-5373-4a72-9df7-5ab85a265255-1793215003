@@ -483,7 +483,9 @@ async function executeFunctionCall(
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-internal-call": "true", // Mark as internal call for auth bypass
+              // CRITICAL: Pass through the Authorization header from the original request
+              // so web-search can authenticate the user
+              ...(req.headers.authorization ? { "Authorization": req.headers.authorization } : {}),
             },
             body: JSON.stringify({ query, count: 3 }),
           });
