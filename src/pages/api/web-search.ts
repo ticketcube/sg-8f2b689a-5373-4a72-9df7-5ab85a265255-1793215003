@@ -25,21 +25,29 @@ export default async function handler(
   }
 
   try {
-    // Authenticate user - web search should only be available to authenticated users
+    // Authenticate user - web search should only be available to authenticated users with aiassist role
     let userId: string | undefined;
     try {
-      const { user } = await getAuthenticatedUser(req);
+      const { user, supabase } = await getAuthenticatedUser(req);
       userId = user.id;
       console.log("🔐 WEB_SEARCH_AUTH: User authenticated:", userId);
-    } catch (authError) {
-      // Allow internal API calls (from smart-conversation.ts) without auth
-      // These will come from the same server, not from external clients
-      const isInternalCall = req.headers['x-internal-call'] === 'true';
-      if (!isInternalCall) {
-        console.log("❌ WEB_SEARCH_AUTH: Authentication failed");
-        return res.status(401).json({ error: "Authentication required" });
+
+      // Check if user has 'aiassist' role
+      const { data: userProfile } = await supabase
+        .from("user_profiles")
+        .select("role")
+        .eq("user_id", userId)
+        .single();
+
+      if (!userProfile || (userProfile.role !== "aiassist" && userProfile.role !== "admin")) {
+        console.log("❌ WEB_SEARCH_AUTH: User lacks aiassist role");
+        return res.status(403).json({ 
+          error: "Access denied - web search requires 'aiassist' role" 
+        });
       }
-      console.log("🔓 WEB_SEARCH_AUTH: Internal API call, bypassing auth");
+    } catch (authError) {
+      console.log("❌ WEB_SEARCH_AUTH: Authentication failed");
+      return res.status(401).json({ error: "Authentication required" });
     }
 
     const { query, count = 3 } = req.body;

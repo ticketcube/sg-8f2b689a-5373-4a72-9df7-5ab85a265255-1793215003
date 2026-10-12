@@ -551,6 +551,30 @@ export default async function handler(
     const userId = user.id;
     console.log("🟦 AUTH_CHECK: User authenticated, userId =", userId);
 
+    // Check if user has 'aiassist' role
+    const { data: userProfile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("user_id", userId)
+      .single();
+
+    if (profileError || !userProfile) {
+      console.log("🔴 ROLE_CHECK: Failed to fetch user profile");
+      return res.status(403).json({ 
+        error: "Access denied - unable to verify user role" 
+      });
+    }
+
+    if (userProfile.role !== "aiassist" && userProfile.role !== "admin") {
+      console.log("🔴 ROLE_CHECK: User role =", userProfile.role, "- access denied");
+      return res.status(403).json({ 
+        error: "Access denied - AI assistant requires 'aiassist' role",
+        currentRole: userProfile.role
+      });
+    }
+
+    console.log("🟦 ROLE_CHECK: Access granted, user role =", userProfile.role);
+
     const { message, conversationMessages = [], mode = "conversation", conversationId: incomingConversationId } = req.body;
 
     console.log("🟦 MESSAGE_RECEIVED:", {
