@@ -8,7 +8,7 @@ import { MessageSquare, Calendar as CalendarIcon, LogOut, User, Plus, Clock, Che
 import { formatDistanceToNow } from "date-fns";
 
 interface Profile {
-  id: string;
+  user_id: string;
   email: string;
   full_name: string;
 }
@@ -48,9 +48,9 @@ export default function DashboardPage() {
     }
 
     const { data } = await supabase
-      .from("profiles")
+      .from("user_profiles")
       .select("*")
-      .eq("id", session.user.id)
+      .eq("user_id", session.user.id)
       .single();
 
     if (data) {

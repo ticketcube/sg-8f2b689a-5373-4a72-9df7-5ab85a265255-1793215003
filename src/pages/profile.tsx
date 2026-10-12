@@ -16,7 +16,7 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [profile, setProfile] = useState({
-    id: "",
+    user_id: "",
     email: "",
     full_name: "",
   });
@@ -34,9 +34,9 @@ export default function ProfilePage() {
     }
 
     const { data } = await supabase
-      .from("profiles")
+      .from("user_profiles")
       .select("*")
-      .eq("id", session.user.id)
+      .eq("user_id", session.user.id)
       .single();
 
     if (data) {
@@ -53,11 +53,11 @@ export default function ProfilePage() {
 
     try {
       const { error: updateError } = await supabase
-        .from("profiles")
+        .from("user_profiles")
         .update({
           full_name: profile.full_name,
         })
-        .eq("id", profile.id);
+        .eq("user_id", profile.user_id);
 
       if (updateError) throw updateError;
 

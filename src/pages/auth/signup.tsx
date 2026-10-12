@@ -52,8 +52,8 @@ export default function SignupPage() {
       if (signUpError) throw signUpError;
 
       if (data.user) {
-        await supabase.from("profiles").upsert({
-          id: data.user.id,
+        await supabase.from("user_profiles").upsert({
+          user_id: data.user.id,
           email: formData.email,
           full_name: formData.fullName,
         });

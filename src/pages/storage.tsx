@@ -58,9 +58,9 @@ export default function StoragePage() {
     }
 
     const { data: profile } = await supabase
-      .from("profiles")
+      .from("user_profiles")
       .select("full_name")
-      .eq("id", session.user.id)
+      .eq("user_id", session.user.id)
       .single();
 
     if (profile?.full_name) {
