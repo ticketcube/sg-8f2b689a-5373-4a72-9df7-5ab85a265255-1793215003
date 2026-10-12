@@ -1,45 +1,25 @@
 ---
-title: Sales Pacing Dashboard Section
+title: Consolidate User Profiles Table
 status: done
-priority: high
-type: feature
-tags: [ui, dashboard, sales-pacing]
-created_by: agent
-created_at: 2026-09-09T19:05:41Z
-position: 1
+priority: urgent
+type: chore
+tags: [database, ai, auth, refactor]
 ---
 
 ## Notes
-
-Build Section 2: Sales Pacing - velocity tracking, status classification, and projections. This shows whether the event is selling fast enough to hit targets.
-
-Components needed:
-- Sales pacing input form (days to event, organic sales assumptions)
-- Pacing status card (ahead/on/behind/critical with visual indicators)
-- Velocity metrics card (current vs required daily sales)
-- Sales pacing chart (Recharts visualization of actual vs target trajectory)
-
-Status classification:
-- Green (Ahead): Over target pace
-- Blue (On Pace): Within 10% of required velocity
-- Orange (Behind): Below required velocity
-- Red (Critical): <70% sold with <14 days remaining
+The application currently suffers from a split-brain profile architecture. The frontend (signup, dashboard, profile UI, storage) uses the `profiles` table, while the backend AI features (smart-conversation, web-search, supabase-admin) use the `user_profiles` table. This means UI updates aren't properly reflected in the AI context. We need to consolidate entirely onto the `profiles` table.
 
 ## Checklist
-
-- [x] Install Recharts for data visualization
-- [x] Create `SalesPacingForm.tsx` (days to event, organic sales/day, historical %)
-- [x] Create `PacingStatusCard.tsx` (visual status with color-coded badges)
-- [x] Create `VelocityMetricsCard.tsx` (current vs required velocity analysis)
-- [x] Create `SalesPacingChart.tsx` (Recharts line chart - actual/target/projected)
-- [x] Integrate pacing calculations from calculation engine
-- [x] Add status classification logic (green/yellow/orange/red)
-- [x] Wire up all components in calculator page
-- [x] Add real-time updates as inputs change
+- [x] Inspect schemas for both `profiles` and `user_profiles` in Supabase using the database tools.
+- [x] Write and execute an SQL migration to add any missing AI-specific columns from `user_profiles` to `profiles`.
+- [x] Write and execute a data migration script to copy existing AI settings/data from `user_profiles` into `profiles`.
+- [x] Refactor `src/pages/api/smart-conversation.ts` to replace all `.from("user_profiles")` queries with `.from("profiles")`.
+- [x] Refactor `src/pages/api/web-search.ts` to query `profiles`.
+- [x] Refactor `src/lib/supabase-admin.ts` to query `profiles`.
+- [x] Regenerate Supabase Types using the `supabase_generate_types` tool so the codebase recognizes the merged schema.
+- [x] (Optional/Safe) Execute SQL to drop the `user_profiles` table if all dependencies have been successfully moved.
 
 ## Acceptance
-
-- User can see current sales velocity vs required velocity
-- Pacing status updates based on performance (ahead/on/behind/critical)
-- Chart visualizes sales trajectory with projections
-- All metrics calculate correctly and update in real-time
+- The AI chat can successfully retrieve the user's name and role using the unified `profiles` table.
+- A user can sign up, modify their profile in the UI, and the AI agent immediately recognizes the updated information.
+- No references to `user_profiles` remain in the codebase API routes.
