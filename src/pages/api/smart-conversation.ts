@@ -184,6 +184,7 @@ async function executeFunctionCall(
   args: any,
   supabase: any,
   userId: string,
+  req: NextApiRequest,
   conversationId?: string
 ): Promise<any> {
   console.log("🟦 FUNCTION_EXEC: Starting", functionName, "for user", userId);
@@ -859,6 +860,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
             functionArgs,
             supabase,
             userId,
+            req,
             incomingConversationId
           );
 
