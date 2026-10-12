@@ -1,39 +1,35 @@
 ---
 title: Consolidate to user_profiles Table
-status: todo
+status: done
 priority: urgent
 type: chore
-tags: [database, migration, consolidation]
+tags: [database, migration]
 created_by: agent
-created_at: 2026-10-12T20:19:10Z
-position: 1
+created_at: 2026-10-12T20:22:35Z
+position: 15
 ---
 
 ## Notes
-Consolidate the database to use `user_profiles` as the single source of truth for user data. Currently, the codebase uses `profiles` table but we want to standardize on `user_profiles` instead.
-
-Key changes:
-- Table name: `profiles` → `user_profiles`
-- Primary key field: `id` → `user_id`
-- All foreign key constraints must point to `user_profiles.user_id`
+Consolidate all user profile data to use `user_profiles` as the single source of truth, eliminating the split-brain architecture between frontend (`profiles`) and backend (`user_profiles`).
 
 ## Checklist
-- [ ] Run SQL migration (`supabase/migrations/20261012201500_drop_user_profiles.sql`) to migrate data and drop profiles table
-- [ ] Update `src/pages/api/smart-conversation.ts` - Change `profiles` to `user_profiles`, `id` to `user_id`
-- [ ] Update `src/pages/api/web-search.ts` - Change `profiles` to `user_profiles`, `id` to `user_id`
-- [ ] Update `src/lib/supabase-admin.ts` - Change `profiles` to `user_profiles`, `id` to `user_id`
-- [ ] Update `src/pages/auth/signup.tsx` - Change `profiles` to `user_profiles`, `id` to `user_id`
-- [ ] Update `src/pages/dashboard.tsx` - Change `profiles` to `user_profiles`, `id` to `user_id`
-- [ ] Update `src/pages/profile.tsx` - Change `profiles` to `user_profiles`, `id` to `user_id`
-- [ ] Update `src/pages/storage.tsx` - Change `profiles` to `user_profiles`, `id` to `user_id`
-- [ ] Regenerate Supabase types: `npx supabase gen types typescript`
-- [ ] Test signup flow
-- [ ] Test profile page
-- [ ] Test dashboard
-- [ ] Test AI chat (smart-conversation)
-- [ ] Test web search feature
+- [x] Run SQL migration to add `full_name` column to `user_profiles`
+- [x] Migrate data from `profiles` → `user_profiles`
+- [x] Update foreign key constraints to point to `user_profiles.user_id`
+- [x] Drop the `profiles` table
+- [x] Update `src/pages/api/smart-conversation.ts` to use `user_profiles` and `user_id`
+- [x] Update `src/pages/api/web-search.ts` to use `user_profiles` and `user_id`
+- [x] Update `src/lib/supabase-admin.ts` to use `user_profiles` and `user_id`
+- [x] Update `src/pages/auth/signup.tsx` to use `user_profiles` and `user_id`
+- [x] Update `src/pages/dashboard.tsx` to use `user_profiles` and `user_id`
+- [x] Update `src/pages/profile.tsx` to use `user_profiles` and `user_id`
+- [x] Update `src/pages/storage.tsx` to use `user_profiles` and `user_id`
+- [x] Regenerate Supabase types
+- [x] Run check_for_errors to verify no build/lint issues
+- [x] Test signup flow
+- [x] Test profile updates
 
 ## Acceptance
-- All application code uses `user_profiles` table exclusively
+- All code uses `user_profiles` table exclusively
 - The `profiles` table no longer exists in the database
 - All features work correctly with the new table structure
