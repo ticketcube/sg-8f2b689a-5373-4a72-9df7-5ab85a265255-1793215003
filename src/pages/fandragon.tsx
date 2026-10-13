@@ -8,6 +8,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogOut, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 
+
+import { useEffect } from "react";
+import { useRouter } from "next/router";
+
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Brain, Lock, Search, Store, Users, MessageSquare } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
 export default function Home() {
   const { user, profile, signOut } = useUserProfile();
   const [showAuth, setShowAuth] = useState(false);
