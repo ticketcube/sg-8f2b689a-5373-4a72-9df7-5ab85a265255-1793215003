@@ -3,12 +3,8 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar as CalendarIcon, List, Plus, ArrowLeft, Edit2, Trash2, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowLeft, ChevronLeft, ChevronRight, Home } from "lucide-react";
+import { format, addDays, subDays, isToday, isTomorrow, isYesterday } from "date-fns";
 
 interface FamilyEvent {
   id: string;
@@ -20,33 +16,23 @@ interface FamilyEvent {
   all_day: boolean;
   event_time: string | null;
   created_at: string;
-  creator?: {
-    email: string;
-    display_name: string | null;
-  };
 }
 
 export default function CalendarPage() {
   const router = useRouter();
   const [events, setEvents] = useState<FamilyEvent[]>([]);
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [showForm, setShowForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    event_date: "",
-    event_type: "event",
-    all_day: true,
-    event_time: ""
-  });
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      loadEventsForDate(currentDate);
+    }
+  }, [currentDate]);
 
   async function checkAuth() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -54,30 +40,28 @@ export default function CalendarPage() {
       router.push("/auth/login");
       return;
     }
-    await loadEvents(session.user.id);
+    await loadEventsForDate(currentDate);
+    setLoading(false);
   }
 
-  async function loadEvents(userId?: string) {
-    setLoading(true);
-    
-    // Get current user's profile to find avatar_url (family identifier)
+  async function loadEventsForDate(date: Date) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     
-    const actualUserId = userId || session.user.id;
+    const dateStr = format(date, 'yyyy-MM-dd');
     
     const { data: profile } = await supabase
       .from("user_profiles")
       .select("avatar_url")
-      .eq("user_id", actualUserId)
+      .eq("user_id", session.user.id)
       .single();
 
     let query = supabase
       .from("family_events")
       .select("*")
-      .order("event_date", { ascending: true });
+      .eq("event_date", dateStr)
+      .order("event_time", { ascending: true });
 
-    // Show user's own events + family events (matched by avatar_url)
     if (profile?.avatar_url) {
       const { data: familyProfiles } = await supabase
         .from("user_profiles")
@@ -89,8 +73,7 @@ export default function CalendarPage() {
         query = query.in("user_id", familyUserIds);
       }
     } else {
-      // No family - show only user's own events
-      query = query.eq("user_id", actualUserId);
+      query = query.eq("user_id", session.user.id);
     }
 
     const { data, error } = await query;
@@ -99,369 +82,157 @@ export default function CalendarPage() {
       console.error("Error loading events:", error);
     }
 
-    if (data) {
-      setEvents(data as any);
-    }
-    setLoading(false);
+    setEvents(data || []);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const eventData = {
-      ...formData,
-      user_id: session.user.id,
-      event_time: formData.all_day ? null : formData.event_time
-    };
-
-    if (editingEvent) {
-      const { error } = await supabase
-        .from("family_events")
-        .update(eventData)
-        .eq("id", editingEvent);
-
-      if (!error) {
-        setShowForm(false);
-        setEditingEvent(null);
-        resetForm();
-        await loadEvents(session.user.id);
-      }
-    } else {
-      const { error } = await supabase
-        .from("family_events")
-        .insert(eventData);
-
-      if (!error) {
-        setShowForm(false);
-        resetForm();
-        await loadEvents(session.user.id);
-      }
-    }
+  function getDayLabel(date: Date): string {
+    if (isToday(date)) return "TODAY";
+    if (isTomorrow(date)) return "TOMORROW";
+    if (isYesterday(date)) return "YESTERDAY";
+    return format(date, 'EEEE').toUpperCase();
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this event?")) return;
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const { error } = await supabase
-      .from("family_events")
-      .delete()
-      .eq("id", id);
-
-    if (!error) {
-      await loadEvents(session.user.id);
-    }
+  function goToPreviousDay() {
+    setCurrentDate(subDays(currentDate, 1));
   }
 
-  function handleEdit(event: FamilyEvent) {
-    setFormData({
-      title: event.title,
-      description: event.description || "",
-      event_date: event.event_date,
-      event_type: event.event_type,
-      all_day: event.all_day,
-      event_time: event.event_time || ""
-    });
-    setEditingEvent(event.id);
-    setShowForm(true);
+  function goToNextDay() {
+    setCurrentDate(addDays(currentDate, 1));
   }
 
-  function resetForm() {
-    setFormData({
-      title: "",
-      description: "",
-      event_date: "",
-      event_type: "event",
-      all_day: true,
-      event_time: ""
-    });
+  function goToToday() {
+    setCurrentDate(new Date());
   }
-
-  function getDaysInMonth(date: Date) {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-
-    const days = [];
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(new Date(year, month, i));
-    }
-    return days;
-  }
-
-  function getEventsForDate(date: Date | null) {
-    if (!date) return [];
-    const dateStr = date.toISOString().split("T")[0];
-    return events.filter(e => e.event_date === dateStr);
-  }
-
-  function nextMonth() {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  }
-
-  function prevMonth() {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  }
-
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  const upcomingEvents = events.filter(e => new Date(e.event_date) >= new Date()).slice(0, 10);
 
   const eventTypeColors: Record<string, string> = {
-    reminder: "bg-blue-100 text-blue-800",
-    milestone: "bg-purple-100 text-purple-800",
-    event: "bg-green-100 text-green-800",
-    birthday: "bg-pink-100 text-pink-800",
-    appointment: "bg-orange-100 text-orange-800",
-    other: "bg-gray-100 text-gray-800"
+    shopping: "bg-gradient-to-br from-purple-500 to-purple-600 border-purple-300",
+    task: "bg-gradient-to-br from-orange-500 to-orange-600 border-orange-300",
+    reminder: "bg-gradient-to-br from-blue-500 to-blue-600 border-blue-300",
+    milestone: "bg-gradient-to-br from-purple-600 to-purple-700 border-purple-400",
+    event: "bg-gradient-to-br from-green-500 to-green-600 border-green-300",
+    birthday: "bg-gradient-to-br from-pink-500 to-pink-600 border-pink-300",
+    appointment: "bg-gradient-to-br from-orange-600 to-orange-700 border-orange-400",
+    other: "bg-gradient-to-br from-gray-500 to-gray-600 border-gray-300"
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+        <div className="text-center">
+          <div className="h-16 w-16 border-8 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <p className="text-2xl text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Dashboard
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-serif font-semibold text-foreground">Family Calendar</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant={viewMode === "calendar" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("calendar")}
-            >
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              Calendar
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+      {/* Header */}
+      <header className="bg-white shadow-md px-6 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="lg" className="p-4">
+              <Home className="w-8 h-8 text-gray-700" />
             </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-            >
-              <List className="h-4 w-4 mr-2" />
-              List
-            </Button>
-            <Button onClick={() => { setShowForm(true); setEditingEvent(null); resetForm(); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Event
-            </Button>
-          </div>
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-800">My Events</h1>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {showForm && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="font-serif">{editingEvent ? "Edit Event" : "New Event"}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Title</label>
-                  <Input
-                    value={formData.title}
-                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    required
-                  />
-                </div>
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-6 py-8">
+        
+        {/* Date Display */}
+        <div className="bg-white rounded-3xl shadow-xl p-8 mb-8 text-center border-4 border-blue-200">
+          <div className="text-xl font-semibold text-blue-600 mb-2">
+            {getDayLabel(currentDate)}
+          </div>
+          <div className="text-4xl font-bold text-gray-900">
+            {format(currentDate, 'MMMM d, yyyy')}
+          </div>
+        </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Date</label>
-                    <Input
-                      type="date"
-                      value={formData.event_date}
-                      onChange={e => setFormData({ ...formData, event_date: e.target.value })}
-                      required
-                    />
+        {/* Navigation Buttons */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <button
+            onClick={goToPreviousDay}
+            className="flex flex-col items-center justify-center
+              rounded-2xl border-4 border-gray-300 bg-white
+              py-8 shadow-lg transition-all hover:bg-gray-50
+              active:scale-95"
+          >
+            <ChevronLeft size={48} strokeWidth={3} className="text-gray-700" />
+            <span className="mt-2 text-xl font-bold text-gray-700">PREVIOUS</span>
+          </button>
+
+          <button
+            onClick={goToToday}
+            className="flex flex-col items-center justify-center
+              rounded-2xl border-4 border-blue-300 bg-blue-600
+              py-8 shadow-lg transition-all hover:bg-blue-700
+              active:scale-95 text-white"
+          >
+            <Home size={48} strokeWidth={3} />
+            <span className="mt-2 text-xl font-bold">TODAY</span>
+          </button>
+
+          <button
+            onClick={goToNextDay}
+            className="flex flex-col items-center justify-center
+              rounded-2xl border-4 border-gray-300 bg-white
+              py-8 shadow-lg transition-all hover:bg-gray-50
+              active:scale-95"
+          >
+            <ChevronRight size={48} strokeWidth={3} className="text-gray-700" />
+            <span className="mt-2 text-xl font-bold text-gray-700">NEXT</span>
+          </button>
+        </div>
+
+        {/* Events List */}
+        <div className="space-y-6">
+          {events.length === 0 ? (
+            <div className="bg-white rounded-3xl shadow-xl p-12 text-center border-4 border-gray-200">
+              <p className="text-3xl font-bold text-gray-400 mb-3">No Events</p>
+              <p className="text-xl text-gray-500">
+                Nothing scheduled for this day
+              </p>
+            </div>
+          ) : (
+            events.map(event => (
+              <div
+                key={event.id}
+                className={`rounded-3xl shadow-xl p-8 text-white border-4 ${
+                  eventTypeColors[event.event_type] || eventTypeColors.other
+                }`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold uppercase tracking-wider opacity-90 mb-2">
+                      {event.event_type}
+                    </div>
+                    <h3 className="text-3xl font-bold leading-tight mb-3">
+                      {event.title}
+                    </h3>
+                    {event.description && (
+                      <p className="text-xl opacity-90 leading-relaxed">
+                        {event.description}
+                      </p>
+                    )}
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Type</label>
-                    <Select value={formData.event_type} onValueChange={v => setFormData({ ...formData, event_type: v })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="event">Event</SelectItem>
-                        <SelectItem value="reminder">Reminder</SelectItem>
-                        <SelectItem value="milestone">Milestone</SelectItem>
-                        <SelectItem value="birthday">Birthday</SelectItem>
-                        <SelectItem value="appointment">Appointment</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="all_day"
-                    checked={formData.all_day}
-                    onChange={e => setFormData({ ...formData, all_day: e.target.checked })}
-                    className="rounded border-gray-300"
-                  />
-                  <label htmlFor="all_day" className="text-sm font-medium">All day event</label>
-                </div>
-
-                {!formData.all_day && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Time</label>
-                    <Input
-                      type="time"
-                      value={formData.event_time}
-                      onChange={e => setFormData({ ...formData, event_time: e.target.value })}
-                    />
+                {!event.all_day && event.event_time && (
+                  <div className="mt-4 pt-4 border-t-2 border-white/30">
+                    <p className="text-2xl font-bold">
+                      🕐 {event.event_time}
+                    </p>
                   </div>
                 )}
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Description</label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <Button type="submit">{editingEvent ? "Update" : "Create"} Event</Button>
-                  <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingEvent(null); resetForm(); }}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
-
-        {viewMode === "calendar" && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="font-serif text-xl">
-                  {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-                </CardTitle>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={prevMonth}>Previous</Button>
-                  <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Today</Button>
-                  <Button variant="outline" size="sm" onClick={nextMonth}>Next</Button>
-                </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-7 gap-2">
-                {dayNames.map(day => (
-                  <div key={day} className="text-center font-medium text-sm text-muted-foreground p-2">
-                    {day}
-                  </div>
-                ))}
-                {getDaysInMonth(currentDate).map((date, idx) => {
-                  const dayEvents = getEventsForDate(date);
-                  const isToday = date && date.toDateString() === new Date().toDateString();
+            ))
+          )}
+        </div>
 
-                  return (
-                    <div
-                      key={idx}
-                      className={cn(
-                        "min-h-24 border border-border p-2 rounded",
-                        !date && "bg-muted",
-                        isToday && "border-accent border-2"
-                      )}
-                    >
-                      {date && (
-                        <>
-                          <div className={cn("text-sm font-medium mb-1", isToday && "text-accent")}>
-                            {date.getDate()}
-                          </div>
-                          <div className="space-y-1">
-                            {dayEvents.map(event => (
-                              <div
-                                key={event.id}
-                                className={cn("text-xs p-1 rounded truncate", eventTypeColors[event.event_type])}
-                                title={event.title}
-                              >
-                                {!event.all_day && event.event_time && (
-                                  <Clock className="inline h-3 w-3 mr-1" />
-                                )}
-                                {event.title}
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {viewMode === "list" && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-serif font-semibold">Upcoming Events</h2>
-            {loading ? (
-              <p className="text-muted-foreground">Loading...</p>
-            ) : upcomingEvents.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No upcoming events. Add one to get started!
-                </CardContent>
-              </Card>
-            ) : (
-              upcomingEvents.map(event => (
-                <Card key={event.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-serif text-lg font-semibold">{event.title}</h3>
-                          <span className={cn("text-xs px-2 py-1 rounded", eventTypeColors[event.event_type])}>
-                            {event.event_type}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {new Date(event.event_date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-                          {!event.all_day && event.event_time && ` at ${event.event_time}`}
-                        </p>
-                        {event.description && (
-                          <p className="text-sm text-foreground mb-2">{event.description}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(event)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(event.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        )}
       </main>
     </div>
   );
