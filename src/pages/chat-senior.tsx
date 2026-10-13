@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, UserCircle } from "lucide-react";
+import { Menu, UserCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { VoiceControls } from "@/components/VoiceControls";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/router";
 
 interface Message {
   id: string;
@@ -28,18 +29,57 @@ export default function SeniorChat() {
   const [mounted, setMounted] = useState(false);
   const [lastResponse, setLastResponse] = useState("");
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
-    getAuthToken();
+    initializeAuth();
   }, []);
 
-  const getAuthToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
+  const initializeAuth = async () => {
+    try {
+      console.log("🔐 Initializing authentication...");
+      setIsAuthLoading(true);
+      setAuthError(null);
+
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      console.log("🔐 Session check:", { 
+        hasSession: !!session, 
+        hasToken: !!session?.access_token,
+        error: error?.message 
+      });
+
+      if (error) {
+        console.error("🔴 Auth error:", error);
+        setAuthError("Authentication error. Please try logging in again.");
+        setIsAuthLoading(false);
+        return;
+      }
+
+      if (!session?.access_token) {
+        console.warn("⚠️ No valid session found");
+        setAuthError("Please log in to use the assistant.");
+        setIsAuthLoading(false);
+        
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          router.push("/auth/login?redirect=/chat-senior");
+        }, 2000);
+        return;
+      }
+
       setAuthToken(session.access_token);
+      console.log("✅ Authentication successful");
+      setIsAuthLoading(false);
+    } catch (error) {
+      console.error("🔴 Auth initialization error:", error);
+      setAuthError("Failed to initialize authentication");
+      setIsAuthLoading(false);
     }
   };
 
@@ -52,7 +92,16 @@ export default function SeniorChat() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading || !authToken) return;
+    if (!input.trim() || isLoading) return;
+    
+    if (!authToken) {
+      toast({
+        title: "Not Authenticated",
+        description: "Please log in to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -66,6 +115,7 @@ export default function SeniorChat() {
     setIsLoading(true);
 
     try {
+      console.log("📤 Sending message to API...");
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
         headers: { 
@@ -81,6 +131,20 @@ export default function SeniorChat() {
         }),
       });
 
+      console.log("📥 API response status:", response.status);
+
+      if (response.status === 401) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          router.push("/auth/login?redirect=/chat-senior");
+        }, 1500);
+        return;
+      }
+
       const data = await response.json();
 
       if (data.response) {
@@ -92,8 +156,6 @@ export default function SeniorChat() {
         };
         setMessages((prev) => [...prev, assistantMessage]);
         setLastResponse(data.response);
-
-        // Auto-speak response
         speakText(data.response);
       } else if (data.error) {
         toast({
@@ -103,6 +165,7 @@ export default function SeniorChat() {
         });
       }
     } catch (error) {
+      console.error("🔴 Request error:", error);
       toast({
         title: "Error",
         description: "Failed to get response. Please try again.",
@@ -123,21 +186,31 @@ export default function SeniorChat() {
       return;
     }
 
-    if (isRecording || !authToken) return;
+    if (isRecording) return;
+    
+    if (!authToken) {
+      toast({
+        title: "Not Authenticated",
+        description: "Please log in to use voice assistant.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const recognition = new (window as any).webkitSpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
 
     recognition.onstart = () => {
+      console.log("🎤 Voice recording started");
       setIsRecording(true);
     };
 
     recognition.onresult = async (event: any) => {
       const transcript = event.results[0][0].transcript;
+      console.log("🎤 Voice transcript:", transcript);
       setIsRecording(false);
       
-      // Immediately send the transcribed message
       const userMessage: Message = {
         id: Date.now().toString(),
         role: "user",
@@ -149,6 +222,7 @@ export default function SeniorChat() {
       setIsLoading(true);
 
       try {
+        console.log("📤 Sending voice message to API...");
         const response = await fetch("/api/smart-conversation", {
           method: "POST",
           headers: { 
@@ -163,6 +237,20 @@ export default function SeniorChat() {
             })),
           }),
         });
+
+        console.log("📥 API response status:", response.status);
+
+        if (response.status === 401) {
+          toast({
+            title: "Session Expired",
+            description: "Please log in again.",
+            variant: "destructive",
+          });
+          setTimeout(() => {
+            router.push("/auth/login?redirect=/chat-senior");
+          }, 1500);
+          return;
+        }
 
         const data = await response.json();
 
@@ -184,6 +272,7 @@ export default function SeniorChat() {
           });
         }
       } catch (error) {
+        console.error("🔴 Request error:", error);
         toast({
           title: "Error",
           description: "Failed to get response. Please try again.",
@@ -194,7 +283,8 @@ export default function SeniorChat() {
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
+      console.error("🔴 Voice recognition error:", event.error);
       setIsRecording(false);
       toast({
         title: "Error",
@@ -204,6 +294,7 @@ export default function SeniorChat() {
     };
 
     recognition.onend = () => {
+      console.log("🎤 Voice recording ended");
       setIsRecording(false);
     };
 
@@ -266,6 +357,42 @@ export default function SeniorChat() {
     }
     setIsSpeaking(!isSpeaking);
   };
+
+  // Show loading state while checking authentication
+  if (isAuthLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+        <div className="text-center space-y-6">
+          <div className="flex gap-3 justify-center">
+            <div className="w-6 h-6 bg-blue-500 rounded-full animate-bounce"></div>
+            <div className="w-6 h-6 bg-blue-500 rounded-full animate-bounce delay-100"></div>
+            <div className="w-6 h-6 bg-blue-500 rounded-full animate-bounce delay-200"></div>
+          </div>
+          <p className="text-2xl text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if authentication failed
+  if (authError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-blue-50 to-indigo-50 px-6">
+        <div className="text-center space-y-6 max-w-md">
+          <AlertCircle className="w-20 h-20 text-red-500 mx-auto" />
+          <h1 className="text-3xl font-bold text-gray-800">Authentication Required</h1>
+          <p className="text-2xl text-gray-600">{authError}</p>
+          <Button
+            onClick={() => router.push("/auth/login?redirect=/chat-senior")}
+            size="lg"
+            className="text-2xl px-8 py-6"
+          >
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
