@@ -1,24 +1,87 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-
-
-import { supabase } from "@/lib/supabase";
-import { useState } from "react";
 import Head from "next/head";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, ArrowRight, Sparkles } from "lucide-react";
-import { useEffect } from "react";
-import { useRouter } from "next/router";
-
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Lock, Search, Store, Users, MessageSquare } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-export default function Home() {
+function useUserProfile() {
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    setProfile(data);
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
+  };
+
+  return { user, profile, signOut };
+}
+
+function AuthDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Welcome to FanDragon</DialogTitle>
+          <DialogDescription>
+            Sign in to access your central identity hub
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 mt-4">
+          <Button
+            onClick={() => router.push("/auth/login")}
+            className="w-full"
+          >
+            Sign In
+          </Button>
+          <Button
+            onClick={() => router.push("/auth/signup")}
+            variant="outline"
+            className="w-full"
+          >
+            Create Account
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function FanDragonPage() {
   const { user, profile, signOut } = useUserProfile();
   const [showAuth, setShowAuth] = useState(false);
 
@@ -76,7 +139,7 @@ export default function Home() {
       {/* Full-Screen Hero Image */}
       <div className="relative w-full h-[40vh] md:h-[50vh] lg:h-[60vh]">
         <Image
-          src="/fandragonlogo.png"
+          src="/fandragon-hero.png"
           alt="FanDragon"
           fill
           priority
@@ -94,23 +157,9 @@ export default function Home() {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           
-          {/* Main Headline - FIXED GRADIENT TEXT */}
+          {/* Main Headline */}
           <div className="text-center mb-6">
             <h1 className="text-5xl md:text-7xl font-bold mb-4">
-              <span 
-                              className="inline-block"
-                              style={{
-                                  background: "linear-gradient(to right, rgb(59, 130, 246), rgb(147, 51, 234))",
-                                  WebkitBackgroundClip: "text",
-                                  WebkitTextFillColor: "transparent",
-                                  backgroundClip: "text"
-                              }}
-               
-              >
-                Protect and Serve
-              </span>
-            </h1>
-            <h2 className="text-4xl md:text-6xl font-bold">
               <span 
                 className="inline-block"
                 style={{
@@ -120,23 +169,13 @@ export default function Home() {
                   backgroundClip: "text"
                 }}
               >
-                
+                Protect and Serve
               </span>
+            </h1>
+            <h2 className="text-3xl md:text-5xl font-semibold text-white/80">
+              Your Central Identity Hub
             </h2>
           </div>
-
-          {/* Subheadline */}
-        
-
-         
-
-
-
-          {/* Footer Tagline */}
-          <div className="text-center mt-20">
-          
-          </div>
-
         </div>
       </main>
 
@@ -145,7 +184,7 @@ export default function Home() {
         onClose={() => setShowAuth(false)} 
       />
 
-      {/* Footer with legal links - positioned at very bottom */}
+      {/* Footer with legal links */}
       <div className="absolute bottom-0 left-0 right-0 z-10 pb-6">
         <div className="flex items-center justify-center gap-6 text-sm">
           <Link 
