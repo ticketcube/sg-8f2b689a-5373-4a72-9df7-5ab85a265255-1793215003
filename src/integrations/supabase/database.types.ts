@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -2402,39 +2402,6 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      saved_items: {
-        Row: {
-          content: Json
-          created_at: string | null
-          id: string
-          metadata: Json | null
-          title: string
-          type: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          content: Json
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          title: string
-          type: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          content?: Json
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          title?: string
-          type?: string
-          updated_at?: string | null
-          user_id?: string | null
         }
         Relationships: []
       }

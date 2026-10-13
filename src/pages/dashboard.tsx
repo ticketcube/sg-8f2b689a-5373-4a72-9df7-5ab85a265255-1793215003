@@ -4,7 +4,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Calendar as CalendarIcon, LogOut, User, Plus, Clock, ChevronRight, Bookmark } from "lucide-react";
+import { MessageSquare, Calendar as CalendarIcon, LogOut, User, Plus, Clock, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface Profile {
@@ -55,15 +55,16 @@ export default function DashboardPage() {
 
     if (data) {
       setProfile(data);
-      await loadDashboardData(session.user.id);
+      await loadDashboardData(session.user.id, data.avatar_url);
     }
     setLoading(false);
   };
 
-  async function loadDashboardData(userId: string) {
-    // Load upcoming calendar events
+  async function loadDashboardData(userId: string, avatarUrl: string | null) {
+    // Load upcoming calendar events (user's own + family shared via avatar_url)
     const today = new Date().toISOString().split('T')[0];
-    const { data: events } = await supabase
+    
+    let query = supabase
       .from("family_events")
       .select("id, title, description, event_date, event_time")
       .gte("event_date", today)
@@ -71,6 +72,22 @@ export default function DashboardPage() {
       .order("event_time", { ascending: true })
       .limit(5);
 
+    // Show user's own events + family events (matched by avatar_url)
+    if (avatarUrl) {
+      const { data: familyProfiles } = await supabase
+        .from("user_profiles")
+        .select("user_id")
+        .eq("avatar_url", avatarUrl);
+      
+      const familyUserIds = familyProfiles?.map(p => p.user_id) || [];
+      if (familyUserIds.length > 0) {
+        query = query.in("user_id", familyUserIds);
+      }
+    } else {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data: events } = await query;
     setUpcomingEvents(events || []);
 
     // Load recent conversations
@@ -261,29 +278,15 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/storage">
+            <Link href="/calendar">
               <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
                 <CardContent className="p-4 flex flex-col items-center text-center">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                    <Bookmark className="w-6 h-6 text-primary" />
+                    <CalendarIcon className="w-6 h-6 text-primary" />
                   </div>
-                  <span className="text-sm font-medium">My Storage</span>
+                  <span className="text-sm font-medium">Calendar</span>
                 </CardContent>
               </Card>
-            </Link>
-          </div>
-        </section>
-
-        {/* Upcoming Projects (Family Calendar) */}
-        <section className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-serif font-semibold text-foreground">
-              Upcoming Projects
-            </h2>
-            <Link href="/calendar">
-              <Button variant="ghost" size="sm">
-                View All
-              </Button>
             </Link>
           </div>
         </section>

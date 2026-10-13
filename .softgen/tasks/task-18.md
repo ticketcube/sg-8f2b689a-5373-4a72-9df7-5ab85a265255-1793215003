@@ -17,8 +17,9 @@ Simplify app to focus only on events - remove items/storage entirely:
 - Keep personal vs shared events for future (avatar_url matching works for now)
 
 ## Checklist
-- [ ] Remove /storage page from navigation and app
-- [ ] Remove saved_items API endpoints
+- [x] Remove /storage page from navigation and app
+- [x] Remove saved_items API endpoints
+- [x] Drop saved_items table from database
 - [ ] Update smart-conversation.ts to convert all saves to calendar events
 - [ ] Fix calendar query to filter by user (user_id OR avatar_url match)
 - [ ] Update dashboard to show calendar events only
