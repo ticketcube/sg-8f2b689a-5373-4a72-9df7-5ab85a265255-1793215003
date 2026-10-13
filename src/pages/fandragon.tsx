@@ -188,14 +188,14 @@ export default function FanDragonPage() {
       <div className="absolute bottom-0 left-0 right-0 z-10 pb-6">
         <div className="flex items-center justify-center gap-6 text-sm">
           <Link 
-            href="/TermsofService" 
+            href="/termsandconditions" 
             className="text-white/80 hover:text-white transition-colors duration-200 hover:underline"
           >
             Terms of Service
           </Link>
           <span className="text-white/50">•</span>
           <Link 
-            href="/privacypolicy" 
+            href="/privacyPolicy" 
             className="text-white/80 hover:text-white transition-colors duration-200 hover:underline"
           >
             Privacy Policy
