@@ -173,7 +173,7 @@ export default function FanDragonPage() {
               </span>
             </h1>
             <h2 className="text-3xl md:text-5xl font-semibold text-white/80">
-              Your Central Identity Hub
+              Your AI Ticket Agent
             </h2>
           </div>
         </div>
