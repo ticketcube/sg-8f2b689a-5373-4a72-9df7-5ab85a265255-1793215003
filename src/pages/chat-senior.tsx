@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, UserCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { VoiceControls } from "@/components/VoiceControls";
+import { supabase } from "@/lib/supabase";
 
 interface Message {
   id: string;
@@ -26,12 +27,21 @@ export default function SeniorChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [lastResponse, setLastResponse] = useState("");
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     setMounted(true);
+    getAuthToken();
   }, []);
+
+  const getAuthToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      setAuthToken(session.access_token);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,7 +52,7 @@ export default function SeniorChat() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !authToken) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -58,7 +68,10 @@ export default function SeniorChat() {
     try {
       const response = await fetch("/api/smart-conversation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authToken}`
+        },
         body: JSON.stringify({
           message: input,
           conversationHistory: messages.map((m) => ({
@@ -82,6 +95,12 @@ export default function SeniorChat() {
 
         // Auto-speak response
         speakText(data.response);
+      } else if (data.error) {
+        toast({
+          title: "Error",
+          description: data.error,
+          variant: "destructive",
+        });
       }
     } catch (error) {
       toast({
@@ -104,7 +123,7 @@ export default function SeniorChat() {
       return;
     }
 
-    if (isRecording) return;
+    if (isRecording || !authToken) return;
 
     const recognition = new (window as any).webkitSpeechRecognition();
     recognition.continuous = false;
@@ -132,7 +151,10 @@ export default function SeniorChat() {
       try {
         const response = await fetch("/api/smart-conversation", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${authToken}`
+          },
           body: JSON.stringify({
             message: transcript,
             conversationHistory: messages.map((m) => ({
@@ -154,6 +176,12 @@ export default function SeniorChat() {
           setMessages((prev) => [...prev, assistantMessage]);
           setLastResponse(data.response);
           speakText(data.response);
+        } else if (data.error) {
+          toast({
+            title: "Error",
+            description: data.error,
+            variant: "destructive",
+          });
         }
       } catch (error) {
         toast({
