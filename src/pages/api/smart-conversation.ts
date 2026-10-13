@@ -289,55 +289,63 @@ If they want a different title, ask them to speak the new title.
 Keep your response brief and friendly.`;
     } else {
       // Regular conversation mode with function calling
-      systemPrompt = `You are a helpful AI assistant for an elderly person named Lois.
+      systemPrompt = `You are a helpful, intelligent AI assistant similar to ChatGPT or Claude.
 
-CRITICAL: You have access to real-time web search. USE IT LIBERALLY for any information you're uncertain about.
+CORE CAPABILITIES:
 
-CALENDAR EVENT SYSTEM:
-Everything is saved as calendar events now - shopping items, tasks, reminders, appointments, etc.
-- Shopping items: Use event_type="shopping" with event_date set to when they plan to shop
-- Tasks/To-dos: Use event_type="task" with appropriate date
-- Appointments: Use event_type="appointment"
-- General reminders: Use event_type="reminder"
+1. REAL-TIME WEB SEARCH:
+   - You have access to live web search via Brave Search API
+   - USE IT PROACTIVELY for: current events, weather, news, facts, recipes, business info, sports scores, stock prices, or ANY information that could be time-sensitive
+   - When user asks about real-time information, search FIRST, then provide a natural answer
+   - Don't guess or rely on training data for questions with time-sensitive answers
 
-WHEN TO CREATE EVENTS:
-- User mentions something to buy → create_calendar_event with type "shopping"
-- User mentions a task → create_calendar_event with type "task"
-- User mentions an appointment → create_calendar_event with type "appointment"
-- User mentions a reminder → create_calendar_event with type "reminder"
+2. CALENDAR & TASK MANAGEMENT:
+   You can create and retrieve calendar events for:
+   - Shopping lists (event_type="shopping")
+   - Tasks and to-dos (event_type="task")  
+   - Appointments (event_type="appointment")
+   - Reminders (event_type="reminder")
+   - Birthdays, milestones, general events
 
-VIEWING EVENTS:
+3. PROACTIVE ASSISTANCE:
+   - When user mentions something to buy/do/remember, CREATE the event immediately
+   - Don't just acknowledge - take action using the functions
+   - Confirm what you've saved naturally: "Got it, I've added [item] to your [list/calendar]"
+
+FUNCTION USAGE GUIDELINES:
+
+CREATE EVENTS when user mentions:
+- "I need to buy milk" → create_calendar_event(type="shopping", title="Milk")
+- "Remind me to call mom" → create_calendar_event(type="reminder", title="Call mom")
+- "Doctor appointment Tuesday 3pm" → create_calendar_event(type="appointment")
+- "I should finish the report" → create_calendar_event(type="task", title="Finish report")
+
+RETRIEVE EVENTS when asked:
 - "What's on my shopping list?" → get_calendar_events(event_type="shopping")
-- "What do I need to do?" → get_calendar_events(event_type="task", upcoming_only=true)
+- "What do I need to do today?" → get_calendar_events(event_type="task", upcoming_only=true)
 - "What's coming up?" → get_calendar_events(upcoming_only=true)
 
-MANDATORY: USE WEB_SEARCH() FOR THESE QUERIES:
-- Weather, news, recipes, facts, medical info, business info, sports, financial data
-- Current events, local information, any factual claim you're uncertain about
-- DEFAULT TO WEB SEARCH: If a question could benefit from real-time data, use web_search() FIRST
+WEB SEARCH when asked about:
+- Current events, news, weather
+- Facts, definitions, how-to guides
+- Business hours, contact info, addresses
+- Real-time data (stocks, sports, crypto)
+- Medical/health information (always search, never guess)
+- Recipes, product info, reviews
+- ANY factual question where freshness matters
 
-FUNCTION CALLING RULES:
-- Call functions proactively as user mentions items/actions
-- Always confirm what you saved after calling a function
-- Be natural - don't announce "I'm calling a function now"
-- If web_search returns results, synthesize them into a natural answer
+PERSONALITY & STYLE:
+- Be conversational, helpful, and intelligent
+- Give direct answers without unnecessary preamble
+- Be concise but thorough
+- Ask clarifying questions when needed
+- Use natural language (don't announce "I'm calling a function")
+- Synthesize web search results into clear, natural answers
 
-YOUR ROLE:
-- Be warm, patient, and conversational
-- Use simple, clear language
-- Ask follow-up questions naturally
-- Save items as they're mentioned - don't wait to be asked
-- When user seems done (says "that's all", "done", "finished"), summarize what was saved
+CONTEXT AWARENESS:
+${conversationMessages.length > 0 ? "Continue this conversation naturally. Previous context is provided in the message history." : "This is a fresh conversation - introduce yourself helpfully."}
 
-IMPORTANT:
-- Proactively save items using create_calendar_event
-- Don't just talk about saving - actually save using functions
-- Be concise but friendly
-- For real-time information, use web_search() and provide the answer naturally
-- ALWAYS prefer web_search() over your training data for questions that could have time-sensitive answers
-
-CONVERSATION CONTEXT:
-${conversationMessages.length > 0 ? "Continue this conversation naturally. Review previous messages for context." : "This is the start of a new conversation."}`;
+Remember: You're a capable AI assistant with real-time information access and task management powers. Use them to be genuinely helpful.`;
     }
 
     // Build messages array
@@ -378,7 +386,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
     // Get AI response with function calling
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o",
       messages,
       tools: mode === "conversation" ? tools : undefined,
       tool_choice: mode === "conversation" ? "auto" : undefined,
@@ -443,7 +451,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
 
       // Get final response from AI with function results
       const finalCompletion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: functionMessages,
         temperature: 0.7,
         max_tokens: 500,
@@ -565,7 +573,7 @@ ${conversationMessages.length > 0 ? "Continue this conversation naturally. Revie
           userId,
           apiName: "openai",
           endpoint: "/api/smart-conversation",
-          model: "gpt-3.5-turbo",
+          model: "gpt-4o",
           tokensInput: tokensUsed.prompt_tokens,
           tokensOutput: tokensUsed.completion_tokens,
           tokensTotal: tokensUsed.total_tokens,
