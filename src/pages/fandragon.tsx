@@ -1,8 +1,13 @@
+import { useEffect } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Brain, Lock, Search, Store, Users, MessageSquare } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { useState } from "react";
 import Head from "next/head";
 import Image from "next/image";
-import { useUserProfile } from "@/contexts/UserProfileContext";
-import AuthDialog from "@/components/AuthDialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogOut, ArrowRight, Sparkles } from "lucide-react";
