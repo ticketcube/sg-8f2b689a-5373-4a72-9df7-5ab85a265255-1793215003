@@ -1,6 +1,6 @@
 ---
 title: Simplify to Events-Only System
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags: [calendar, events, simplification]
@@ -20,10 +20,10 @@ Simplify app to focus only on events - remove items/storage entirely:
 - [x] Remove /storage page from navigation and app
 - [x] Remove saved_items API endpoints
 - [x] Drop saved_items table from database
-- [ ] Update smart-conversation.ts to convert all saves to calendar events
-- [ ] Fix calendar query to filter by user (user_id OR avatar_url match)
-- [ ] Update dashboard to show calendar events only
-- [ ] Remove storage-related components
+- [x] Update smart-conversation.ts to convert all saves to calendar events
+- [x] Fix calendar query to filter by user (user_id OR avatar_url match)
+- [x] Update dashboard to show calendar events only
+- [x] Remove storage-related components
 
 ## Acceptance
 - Storage page is removed/inaccessible

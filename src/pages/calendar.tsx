@@ -46,22 +46,54 @@ export default function CalendarPage() {
 
   useEffect(() => {
     checkAuth();
-    loadEvents();
   }, []);
 
   async function checkAuth() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       router.push("/auth/login");
+      return;
     }
+    await loadEvents(session.user.id);
   }
 
-  async function loadEvents() {
+  async function loadEvents(userId?: string) {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // Get current user's profile to find avatar_url (family identifier)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    
+    const actualUserId = userId || session.user.id;
+    
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("avatar_url")
+      .eq("user_id", actualUserId)
+      .single();
+
+    let query = supabase
       .from("family_events")
       .select("*")
       .order("event_date", { ascending: true });
+
+    // Show user's own events + family events (matched by avatar_url)
+    if (profile?.avatar_url) {
+      const { data: familyProfiles } = await supabase
+        .from("user_profiles")
+        .select("user_id")
+        .eq("avatar_url", profile.avatar_url);
+      
+      const familyUserIds = familyProfiles?.map(p => p.user_id) || [];
+      if (familyUserIds.length > 0) {
+        query = query.in("user_id", familyUserIds);
+      }
+    } else {
+      // No family - show only user's own events
+      query = query.eq("user_id", actualUserId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error loading events:", error);
@@ -94,7 +126,7 @@ export default function CalendarPage() {
         setShowForm(false);
         setEditingEvent(null);
         resetForm();
-        loadEvents();
+        await loadEvents(session.user.id);
       }
     } else {
       const { error } = await supabase
@@ -104,7 +136,7 @@ export default function CalendarPage() {
       if (!error) {
         setShowForm(false);
         resetForm();
-        loadEvents();
+        await loadEvents(session.user.id);
       }
     }
   }
@@ -112,13 +144,16 @@ export default function CalendarPage() {
   async function handleDelete(id: string) {
     if (!confirm("Delete this event?")) return;
 
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
     const { error } = await supabase
       .from("family_events")
       .delete()
       .eq("id", id);
 
     if (!error) {
-      loadEvents();
+      await loadEvents(session.user.id);
     }
   }
 
