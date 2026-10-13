@@ -8,7 +8,6 @@ import { supabase } from "@/lib/supabase";
 import { useState } from "react";
 import Head from "next/head";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogOut, ArrowRight, Sparkles } from "lucide-react";
 import { useEffect } from "react";
