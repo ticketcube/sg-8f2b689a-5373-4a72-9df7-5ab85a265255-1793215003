@@ -12,13 +12,16 @@ interface Profile {
   full_name: string;
 }
 
-interface CalendarEvent {
-  id: string;
-  title: string;
-  description: string | null;
-  event_date: string;
-  event_time: string | null;
-  user_id: string;
+interface FamilyEvent {
+    id: string;
+    user_id: string;
+    title: string;
+    description: string | null;
+    event_date: string;
+    event_type: string;
+    all_day: boolean;
+    event_time: string | null;
+    created_at: string;
 }
 
 export default function DashboardPage() {
@@ -26,7 +29,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<FamilyEvent[]>([]);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
 
   useEffect(() => {
