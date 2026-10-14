@@ -12,7 +12,7 @@ const FANDRAGON_CONFIG = {
   tokenEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/token",
   userinfoEndpoint: "https://agyoehyzvergiiwdbzmz.supabase.co/auth/v1/oauth/userinfo",
   clientId: "782f7b71-412a-475a-8ab4-602b5ec9af7c",
-  redirectUri: "https://aiassist.fandragon.com/auth/callback",
+  redirectUri: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
   scopes: ["openid", "email", "profile"],
 };
 
