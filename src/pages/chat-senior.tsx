@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, UserCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { VoiceControls } from "@/components/VoiceControls";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useRouter } from "next/router";
 
 interface Message {
