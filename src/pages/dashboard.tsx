@@ -3,7 +3,8 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Calendar as CalendarIcon, LogOut, User } from "lucide-react";
+import { MessageSquare, Calendar as CalendarIcon, LogOut, User, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface Profile {
   user_id: string;
@@ -17,13 +18,16 @@ interface CalendarEvent {
   description: string | null;
   event_date: string;
   event_time: string | null;
+  user_id: string;
 }
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -55,7 +59,7 @@ export default function DashboardPage() {
     
     let query = supabase
       .from("family_events")
-      .select("id, title, description, event_date, event_time")
+      .select("id, title, description, event_date, event_time, user_id")
       .gte("event_date", today)
       .order("event_date", { ascending: true })
       .order("event_time", { ascending: true })
@@ -78,6 +82,47 @@ export default function DashboardPage() {
     const { data: events } = await query;
     setUpcomingEvents(events || []);
   }
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!profile) return;
+
+    setDeletingEventId(eventId);
+
+    try {
+      const { error } = await supabase
+        .from("family_events")
+        .delete()
+        .eq("id", eventId)
+        .eq("user_id", profile.user_id); // Ensure user can only delete their own events
+
+      if (error) {
+        console.error("Error deleting event:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete event. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Remove from local state
+      setUpcomingEvents(prev => prev.filter(e => e.id !== eventId));
+
+      toast({
+        title: "Event Deleted",
+        description: "The event has been removed from your calendar.",
+      });
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingEventId(null);
+    }
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -122,12 +167,31 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Coming Up Next</h2>
             <div className="space-y-3">
               {upcomingEvents.slice(0, 2).map(event => (
-                <div key={event.id} className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-6 border-2 border-yellow-300">
-                  <p className="text-2xl font-bold text-gray-900">{event.title}</p>
-                  <p className="text-xl text-gray-700 mt-2">
-                    {new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                    {event.event_time && ` at ${event.event_time}`}
-                  </p>
+                <div key={event.id} className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-6 border-2 border-yellow-300 relative">
+                  <div className="pr-16">
+                    <p className="text-2xl font-bold text-gray-900">{event.title}</p>
+                    <p className="text-xl text-gray-700 mt-2">
+                      {new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                      {event.event_time && ` at ${event.event_time}`}
+                    </p>
+                  </div>
+                  
+                  {/* Delete button - only show for user's own events */}
+                  {profile && event.user_id === profile.user_id && (
+                    <Button
+                      variant="ghost"
+                      size="lg"
+                      onClick={() => handleDeleteEvent(event.id)}
+                      disabled={deletingEventId === event.id}
+                      className="absolute top-4 right-4 p-3 hover:bg-red-100 hover:text-red-600"
+                    >
+                      {deletingEventId === event.id ? (
+                        <div className="w-6 h-6 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-7 h-7" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
