@@ -51,9 +51,9 @@ export default function CalendarPage() {
     const dateStr = format(date, 'yyyy-MM-dd');
     
     const { data: profile } = await supabase
-      .from("user_profiles")
+      .from("profiles")
       .select("avatar_url")
-      .eq("user_id", session.user.id)
+      .eq("id", session.user.id)
       .single();
 
     let query = supabase
@@ -64,11 +64,11 @@ export default function CalendarPage() {
 
     if (profile?.avatar_url) {
       const { data: familyProfiles } = await supabase
-        .from("user_profiles")
-        .select("user_id")
+        .from("profiles")
+        .select("id")
         .eq("avatar_url", profile.avatar_url);
       
-      const familyUserIds = familyProfiles?.map(p => p.user_id) || [];
+      const familyUserIds = familyProfiles?.map(p => p.id) || [];
       if (familyUserIds.length > 0) {
         query = query.in("user_id", familyUserIds);
       }
