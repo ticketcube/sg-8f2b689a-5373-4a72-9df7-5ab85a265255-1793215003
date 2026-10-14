@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { EventDetailsForm } from "@/components/EventEconomics/EventDetailsForm";
 import { TicketEconomicsForm } from "@/components/EventEconomics/TicketEconomicsForm";
 import { EconomicsKPICards } from "@/components/EventEconomics/EconomicsKPICards";

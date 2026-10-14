@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Plus, Save, Trash2, ZoomIn, ZoomOut, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Node {
   id: string;
