@@ -177,16 +177,8 @@ export default function SeniorChat() {
   };
 
   const handleVoiceInput = async () => {
-    if (!("webkitSpeechRecognition" in window)) {
-      toast({
-        title: "Not Supported",
-        description: "Voice input is not supported in your browser.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isRecording) return;
+    // Check for browser speech recognition support (desktop Chrome/Safari)
+    const hasWebkitSpeech = "webkitSpeechRecognition" in window;
     
     if (!authToken) {
       toast({
@@ -197,117 +189,229 @@ export default function SeniorChat() {
       return;
     }
 
-    const recognition = new (window as any).webkitSpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    if (isRecording) return;
 
-    recognition.onstart = () => {
-      console.log("🎤 Voice recording started");
-      setIsRecording(true);
-    };
+    // Use browser API if available (desktop)
+    if (hasWebkitSpeech) {
+      const recognition = new (window as any).webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
 
-    recognition.onresult = async (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      console.log("🎤 Voice transcript:", transcript);
-      setIsRecording(false);
-      
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        role: "user",
-        content: transcript,
-        timestamp: new Date(),
+      recognition.onstart = () => {
+        console.log("🎤 Voice recording started (browser API)");
+        setIsRecording(true);
       };
 
-      setMessages((prev) => [...prev, userMessage]);
-      setIsLoading(true);
+      recognition.onresult = async (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        console.log("🎤 Voice transcript:", transcript);
+        setIsRecording(false);
+        await processVoiceMessage(transcript);
+      };
 
-      try {
-        console.log("📤 Sending voice message to API...");
-        const response = await fetch("/api/smart-conversation", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            message: transcript,
-            conversationHistory: messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          }),
-        });
-
-        console.log("📥 API response status:", response.status);
-
-        if (response.status === 401) {
-          toast({
-            title: "Session Expired",
-            description: "Please log in again.",
-            variant: "destructive",
-          });
-          setTimeout(() => {
-            router.push("/auth/login?redirect=/chat-senior");
-          }, 1500);
-          return;
-        }
-
-        const data = await response.json();
-
-        if (data.response) {
-          const assistantMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: data.response,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, assistantMessage]);
-          setLastResponse(data.response);
-          speakText(data.response);
-        } else if (data.error) {
-          toast({
-            title: "Error",
-            description: data.error,
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("🔴 Request error:", error);
+      recognition.onerror = (event: any) => {
+        console.error("🔴 Voice recognition error:", event.error);
+        setIsRecording(false);
         toast({
           title: "Error",
-          description: "Failed to get response. Please try again.",
+          description: "Could not capture voice. Please try again.",
           variant: "destructive",
         });
-      } finally {
-        setIsLoading(false);
+      };
+
+      recognition.onend = () => {
+        console.log("🎤 Voice recording ended");
+        setIsRecording(false);
+      };
+
+      recognition.start();
+    } else {
+      // Fallback to MediaRecorder + Whisper API (iOS/mobile)
+      console.log("🎤 Using MediaRecorder fallback for voice input");
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        const audioChunks: Blob[] = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          console.log("🎤 Recording stopped, processing audio...");
+          setIsRecording(false);
+          
+          const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+          
+          // Send to speech-to-text API
+          const formData = new FormData();
+          formData.append("audio", audioBlob);
+
+          try {
+            setIsLoading(true);
+            const response = await fetch("/api/speech-to-text", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${authToken}`
+              },
+              body: formData,
+            });
+
+            if (!response.ok) {
+              throw new Error("Failed to transcribe audio");
+            }
+
+            const data = await response.json();
+            const transcript = data.text;
+            
+            console.log("🎤 Transcription:", transcript);
+            
+            // Stop the media stream
+            stream.getTracks().forEach(track => track.stop());
+            
+            await processVoiceMessage(transcript);
+          } catch (error) {
+            console.error("🔴 Transcription error:", error);
+            stream.getTracks().forEach(track => track.stop());
+            setIsLoading(false);
+            toast({
+              title: "Error",
+              description: "Failed to transcribe audio. Please try again.",
+              variant: "destructive",
+            });
+          }
+        };
+
+        mediaRecorder.onerror = (event: any) => {
+          console.error("🔴 MediaRecorder error:", event.error);
+          setIsRecording(false);
+          stream.getTracks().forEach(track => track.stop());
+          toast({
+            title: "Error",
+            description: "Recording failed. Please try again.",
+            variant: "destructive",
+          });
+        };
+
+        setIsRecording(true);
+        mediaRecorder.start();
+        
+        // Auto-stop after 30 seconds (safety timeout)
+        setTimeout(() => {
+          if (mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+          }
+        }, 30000);
+
+        // Manual stop - attach to component state for handleStop to use
+        (window as any)._currentMediaRecorder = mediaRecorder;
+        
+      } catch (error) {
+        console.error("🔴 getUserMedia error:", error);
+        toast({
+          title: "Microphone Access Denied",
+          description: "Please allow microphone access to use voice input.",
+          variant: "destructive",
+        });
       }
+    }
+  };
+
+  // Extract message processing logic to reuse for both paths
+  const processVoiceMessage = async (transcript: string) => {
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: transcript,
+      timestamp: new Date(),
     };
 
-    recognition.onerror = (event: any) => {
-      console.error("🔴 Voice recognition error:", event.error);
-      setIsRecording(false);
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      console.log("📤 Sending voice message to API...");
+      const response = await fetch("/api/smart-conversation", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          message: transcript,
+          conversationHistory: messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      });
+
+      console.log("📥 API response status:", response.status);
+
+      if (response.status === 401) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          router.push("/auth/login?redirect=/chat-senior");
+        }, 1500);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.response) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setLastResponse(data.response);
+        speakText(data.response);
+      } else if (data.error) {
+        toast({
+          title: "Error",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("🔴 Request error:", error);
       toast({
         title: "Error",
-        description: "Could not capture voice. Please try again.",
+        description: "Failed to get response. Please try again.",
         variant: "destructive",
       });
-    };
-
-    recognition.onend = () => {
-      console.log("🎤 Voice recording ended");
-      setIsRecording(false);
-    };
-
-    recognition.start();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleStop = () => {
-    if (isRecording) {
+    // Stop browser speech recognition if active
+    if (isRecording && (window as any).webkitSpeechRecognition) {
       window.speechSynthesis.cancel();
     }
+    
+    // Stop MediaRecorder if active
+    if ((window as any)._currentMediaRecorder) {
+      const recorder = (window as any)._currentMediaRecorder;
+      if (recorder.state === "recording") {
+        recorder.stop();
+      }
+      (window as any)._currentMediaRecorder = null;
+    }
+    
+    // Stop text-to-speech
     if (isSpeaking) {
       window.speechSynthesis.cancel();
     }
+    
     setIsRecording(false);
     setIsSpeaking(false);
   };
