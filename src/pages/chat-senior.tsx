@@ -40,6 +40,51 @@ export default function SeniorChat() {
     initializeAuth();
   }, []);
 
+  useEffect(() => {
+    const { conversation } = router.query;
+    if (conversation && typeof conversation === "string" && authToken) {
+      loadExistingConversation(conversation);
+    }
+  }, [router.query, authToken]);
+
+  const loadExistingConversation = async (conversationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("id", conversationId)
+        .single();
+
+      if (error) {
+        console.error("Error loading conversation:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load conversation",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data && data.messages) {
+        const formattedMessages: Message[] = data.messages.map((msg: any, index: number) => ({
+          id: `${Date.now()}-${index}`,
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+        }));
+        
+        setMessages(formattedMessages);
+        
+        toast({
+          title: "Conversation Loaded",
+          description: `${formattedMessages.length} messages restored`,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load conversation:", error);
+    }
+  };
+
   const initializeAuth = async () => {
     try {
       console.log("🔐 Initializing authentication...");
@@ -503,14 +548,29 @@ export default function SeniorChat() {
       {/* Header */}
       <header className="bg-white shadow-md px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="lg" className="p-4">
+          <Button 
+            variant="ghost" 
+            size="lg" 
+            className="p-4"
+            onClick={() => router.push("/dashboard")}
+          >
             <Menu className="w-8 h-8 text-gray-700" />
           </Button>
           <h1 className="text-3xl font-bold text-gray-800">Chat Assistant</h1>
         </div>
-        <Button variant="ghost" size="lg" className="p-4">
-          <UserCircle className="w-8 h-8 text-gray-700" />
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            size="lg" 
+            className="px-6 py-4 text-xl"
+            onClick={() => router.push("/dashboard")}
+          >
+            Dashboard
+          </Button>
+          <Button variant="ghost" size="lg" className="p-4">
+            <UserCircle className="w-8 h-8 text-gray-700" />
+          </Button>
+        </div>
       </header>
 
       {/* Messages Area */}
