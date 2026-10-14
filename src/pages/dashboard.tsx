@@ -216,20 +216,38 @@ export default function DashboardPage() {
             </button>
           </Link>
 
-          {/* View Events Button */}
-          <Link href="/calendar">
-            <button className="w-full flex flex-col items-center justify-center
-              rounded-3xl border-8 border-blue-200 bg-blue-600
-              text-white shadow-2xl transition-all duration-200
-              hover:scale-105 hover:bg-blue-700 active:scale-95
-              py-12 px-8">
-              <CalendarIcon size={68} strokeWidth={2.5} />
-              <span className="mt-4 text-4xl font-extrabold tracking-wide">
-                MY EVENTS
-              </span>
-              <span className="mt-2 text-xl">View your schedule</span>
-            </button>
-          </Link>
+          {/* Two-column grid for Events and Conversations */}
+          <div className="grid grid-cols-2 gap-6">
+            {/* View Events Button */}
+            <Link href="/calendar">
+              <button className="w-full flex flex-col items-center justify-center
+                rounded-3xl border-8 border-blue-200 bg-blue-600
+                text-white shadow-2xl transition-all duration-200
+                hover:scale-105 hover:bg-blue-700 active:scale-95
+                py-12 px-8">
+                <CalendarIcon size={56} strokeWidth={2.5} />
+                <span className="mt-4 text-3xl font-extrabold tracking-wide">
+                  MY EVENTS
+                </span>
+                <span className="mt-2 text-lg">View schedule</span>
+              </button>
+            </Link>
+
+            {/* View Conversations Button */}
+            <Link href="/chat">
+              <button className="w-full flex flex-col items-center justify-center
+                rounded-3xl border-8 border-purple-200 bg-purple-600
+                text-white shadow-2xl transition-all duration-200
+                hover:scale-105 hover:bg-purple-700 active:scale-95
+                py-12 px-8">
+                <MessageSquare size={56} strokeWidth={2.5} />
+                <span className="mt-4 text-3xl font-extrabold tracking-wide">
+                  MY CHATS
+                </span>
+                <span className="mt-2 text-lg">Past conversations</span>
+              </button>
+            </Link>
+          </div>
 
         </div>
 
