@@ -76,7 +76,10 @@ export default function SeniorChat() {
       }
 
       if (data && data.messages) {
-        const formattedMessages: Message[] = data.messages.map((msg: any, index: number) => ({
+        // Type guard for Json -> array of messages
+        const messagesData = Array.isArray(data.messages) ? data.messages : [];
+        
+        const formattedMessages: Message[] = messagesData.map((msg: any, index: number) => ({
           id: `${Date.now()}-${index}`,
           role: msg.role,
           content: msg.content,
