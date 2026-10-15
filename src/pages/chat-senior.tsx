@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, UserCircle, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Menu, UserCircle, AlertCircle, Keyboard, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { VoiceControls } from "@/components/VoiceControls";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +32,9 @@ export default function SeniorChat() {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showTextInput, setShowTextInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -46,6 +49,13 @@ export default function SeniorChat() {
       loadExistingConversation(conversation);
     }
   }, [router.query, authToken]);
+
+  // Auto-focus input when text mode is enabled
+  useEffect(() => {
+    if (showTextInput && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [showTextInput]);
 
   const loadExistingConversation = async (conversationId: string) => {
     try {
@@ -168,7 +178,7 @@ export default function SeniorChat() {
           "Authorization": `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          message: input,
+          message: userMessage.content,
           conversationHistory: messages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -218,6 +228,13 @@ export default function SeniorChat() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
   };
 
@@ -546,35 +563,37 @@ export default function SeniorChat() {
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       {/* Header */}
-      <header className="bg-white shadow-md px-6 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <header className="bg-white shadow-md px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Button 
             variant="ghost" 
             size="lg" 
-            className="p-4"
+            className="p-3 sm:p-4"
             onClick={() => router.push("/dashboard")}
           >
-            <Menu className="w-8 h-8 text-gray-700" />
+            <Menu className="w-6 h-6 sm:w-8 sm:h-8 text-gray-700" />
           </Button>
-          <h1 className="text-3xl font-bold text-gray-800">Chat Assistant</h1>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-800">Chat Assistant</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Button 
-            variant="outline" 
+            variant={showTextInput ? "default" : "outline"}
             size="lg" 
-            className="px-6 py-4 text-xl"
-            onClick={() => router.push("/dashboard")}
+            className="p-3 sm:px-6 sm:py-4"
+            onClick={() => setShowTextInput(!showTextInput)}
+            title={showTextInput ? "Hide keyboard" : "Show keyboard"}
           >
-            Dashboard
+            <Keyboard className="w-5 h-5 sm:w-6 sm:h-6" />
+            <span className="hidden sm:inline ml-2 text-lg">{showTextInput ? "Hide" : "Type"}</span>
           </Button>
-          <Button variant="ghost" size="lg" className="p-4">
-            <UserCircle className="w-8 h-8 text-gray-700" />
+          <Button variant="ghost" size="lg" className="p-3 sm:p-4">
+            <UserCircle className="w-6 h-6 sm:w-8 sm:h-8 text-gray-700" />
           </Button>
         </div>
       </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4 sm:space-y-6">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -583,15 +602,15 @@ export default function SeniorChat() {
             }`}
           >
             <div
-              className={`max-w-[85%] rounded-3xl px-8 py-6 shadow-lg ${
+              className={`max-w-[85%] rounded-2xl sm:rounded-3xl px-4 sm:px-8 py-4 sm:py-6 shadow-lg ${
                 message.role === "user"
                   ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white"
                   : "bg-white text-gray-800 border-2 border-gray-200"
               }`}
             >
-              <p className="text-2xl leading-relaxed">{message.content}</p>
+              <p className="text-lg sm:text-2xl leading-relaxed">{message.content}</p>
               {mounted && (
-                <span className="text-sm opacity-70 mt-3 block">
+                <span className="text-xs sm:text-sm opacity-70 mt-2 sm:mt-3 block">
                   {message.timestamp.toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -603,11 +622,11 @@ export default function SeniorChat() {
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-white rounded-3xl px-8 py-6 shadow-lg border-2 border-gray-200">
-              <div className="flex gap-3">
-                <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+            <div className="bg-white rounded-2xl sm:rounded-3xl px-6 sm:px-8 py-4 sm:py-6 shadow-lg border-2 border-gray-200">
+              <div className="flex gap-2 sm:gap-3">
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce delay-200"></div>
               </div>
             </div>
           </div>
@@ -615,14 +634,42 @@ export default function SeniorChat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Replaced with VoiceControls */}
+      {/* Input Area - Toggle between Text Input and Voice Controls */}
       <div className="bg-white border-t-4 border-gray-200">
-        <VoiceControls
-          onStart={handleVoiceInput}
-          onStop={handleStop}
-          onHearAgain={handleHearAgain}
-          onEndThread={handleEndThread}
-        />
+        {showTextInput ? (
+          /* Text Input Mode */
+          <div className="p-4 sm:p-6">
+            <div className="flex gap-2 sm:gap-4">
+              <Input
+                ref={inputRef}
+                type="text"
+                placeholder="Type your message..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={isLoading}
+                className="text-lg sm:text-xl h-14 sm:h-16 px-4 sm:px-6 rounded-2xl border-2 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+              <Button
+                onClick={handleSend}
+                disabled={!input.trim() || isLoading}
+                size="lg"
+                className="h-14 sm:h-16 px-6 sm:px-8 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-lg disabled:opacity-50"
+              >
+                <Send className="w-5 h-5 sm:w-6 sm:h-6" />
+                <span className="hidden sm:inline ml-2 text-lg">Send</span>
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* Voice Controls Mode */
+          <VoiceControls
+            onStart={handleVoiceInput}
+            onStop={handleStop}
+            onHearAgain={handleHearAgain}
+            onEndThread={handleEndThread}
+          />
+        )}
       </div>
     </div>
   );
