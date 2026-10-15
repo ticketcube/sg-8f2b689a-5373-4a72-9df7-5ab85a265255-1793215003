@@ -71,7 +71,7 @@ export default function ChatHistory() {
     // Parse conversations with proper Json handling
     const parsedConversations = (data || []).map(conv => ({
       ...conv,
-      messages: Array.isArray(conv.messages) ? conv.messages as Message[] : []
+      messages: Array.isArray(conv.messages) ? conv.messages as unknown as Message[] : []
     }));
 
     setConversations(parsedConversations);

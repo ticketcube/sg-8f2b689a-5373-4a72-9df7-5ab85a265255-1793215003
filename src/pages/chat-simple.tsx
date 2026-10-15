@@ -102,7 +102,7 @@ export default function ChatSimplePage() {
     // Parse messages from Json type
     const messagesData = data.messages;
     if (Array.isArray(messagesData)) {
-      setMessages(messagesData as Message[]);
+      setMessages(messagesData as unknown as Message[]);
     } else {
       setMessages([]);
     }
