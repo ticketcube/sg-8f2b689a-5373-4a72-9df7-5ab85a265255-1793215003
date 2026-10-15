@@ -18,7 +18,7 @@ interface FamilyEvent {
     title: string;
     description: string | null;
     event_date: string;
-    event_type: string;
+    event_type: string | null;
     all_day: boolean;
     event_time: string | null;
     created_at: string;
@@ -62,7 +62,7 @@ export default function DashboardPage() {
     
     let query = supabase
       .from("family_events")
-      .select("id, title, description, event_date, event_time, user_id")
+      .select("*")
       .gte("event_date", today)
       .order("event_date", { ascending: true })
       .order("event_time", { ascending: true })

@@ -99,7 +99,13 @@ export default function ChatSimplePage() {
     }
 
     setConversationId(id);
-    setMessages(data.messages || []);
+    // Parse messages from Json type
+    const messagesData = data.messages;
+    if (Array.isArray(messagesData)) {
+      setMessages(messagesData as Message[]);
+    } else {
+      setMessages([]);
+    }
   };
 
   const sendMessage = async (messageText?: string) => {
@@ -152,7 +158,7 @@ export default function ChatSimplePage() {
       await supabase
         .from("conversations")
         .update({
-          messages: finalMessages,
+          messages: finalMessages as any, // Cast to any for Json type compatibility
           title: messages.length === 0 ? textToSend.slice(0, 50) : undefined,
           updated_at: new Date().toISOString()
         })
@@ -276,36 +282,6 @@ export default function ChatSimplePage() {
     setVoiceMode(!voiceMode);
   }
 
-  async function handleSaveMessage(message: any) {
-    if (!message.content || isSaving) return;
-    
-    setIsSaving(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const { error } = await supabase
-      .from("saved_items")
-      .insert({
-        user_id: session.user.id,
-        type: "note",
-        title: `Note: ${message.content.slice(0, 50)}...`,
-        content: { 
-          message: message.content,
-          role: message.role,
-          timestamp: new Date().toISOString()
-        },
-        metadata: { 
-          conversation_id: conversationId,
-          tags: ["chat", "ai-response"]
-        }
-      });
-
-    if (!error) {
-      alert("Saved to your private storage!");
-    }
-    setIsSaving(false);
-  }
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -402,17 +378,6 @@ export default function ChatSimplePage() {
                       </p>
                     </CardContent>
                   </Card>
-                  {message.role === "assistant" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSaveMessage(message)}
-                      disabled={isSaving}
-                      className="mt-2"
-                    >
-                      <Bookmark className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
               </div>
             ))

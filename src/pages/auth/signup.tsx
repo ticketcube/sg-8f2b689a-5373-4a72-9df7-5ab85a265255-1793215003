@@ -56,6 +56,7 @@ export default function SignupPage() {
           user_id: data.user.id,
           email: formData.email,
           full_name: formData.fullName,
+          username: formData.email.split('@')[0], // Generate username from email
         });
 
         setSuccess(true);

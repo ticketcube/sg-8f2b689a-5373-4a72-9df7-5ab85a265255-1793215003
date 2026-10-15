@@ -34,9 +34,9 @@ function useUserProfile() {
 
     const fetchProfile = async (userId: string) => {
         const { data } = await supabase
-            .from("profiles")
+            .from("user_profiles")
             .select("*")
-            .eq("id", userId)
+            .eq("user_id", userId)
             .single();
         setProfile(data);
     };

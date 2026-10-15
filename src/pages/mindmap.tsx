@@ -66,12 +66,15 @@ function MindMapCanvas() {
 
       if (error) throw error;
       if (data) {
-        setSavedMaps(data.map(map => ({
-          id: map.id,
-          title: map.title,
-          nodes: map.data.nodes,
-          connections: map.data.connections
-        })));
+        setSavedMaps(data.map(map => {
+          const mapData = map.data as any;
+          return {
+            id: map.id,
+            title: map.title,
+            nodes: Array.isArray(mapData?.nodes) ? mapData.nodes : [],
+            connections: Array.isArray(mapData?.connections) ? mapData.connections : []
+          };
+        }));
       }
     } catch (error) {
       console.error("Error loading maps:", error);
@@ -93,7 +96,7 @@ function MindMapCanvas() {
       const mapData = {
         user_id: user.id,
         title: mindMapTitle,
-        data: { nodes, connections }
+        data: { nodes, connections } as any // Cast to any for Json type compatibility
       };
 
       if (currentMapId) {

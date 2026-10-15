@@ -68,7 +68,13 @@ export default function ChatHistory() {
       return;
     }
 
-    setConversations(data || []);
+    // Parse conversations with proper Json handling
+    const parsedConversations = (data || []).map(conv => ({
+      ...conv,
+      messages: Array.isArray(conv.messages) ? conv.messages as Message[] : []
+    }));
+
+    setConversations(parsedConversations);
   };
 
   const deleteConversation = async (id: string, e: React.MouseEvent) => {
