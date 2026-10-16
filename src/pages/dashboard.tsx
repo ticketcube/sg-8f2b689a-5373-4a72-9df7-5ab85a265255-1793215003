@@ -173,10 +173,7 @@ export default function DashboardPage() {
                 <div key={event.id} className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl p-6 border-2 border-yellow-300 relative">
                   <div className="pr-16">
                     <p className="text-2xl font-bold text-gray-900">{event.title}</p>
-                    <p className="text-xl text-gray-700 mt-2">
-                      {new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                      {event.event_time && ` at ${event.event_time}`}
-                    </p>
+                    
                   </div>
                   
                   {/* Delete button - only show for user's own events */}
