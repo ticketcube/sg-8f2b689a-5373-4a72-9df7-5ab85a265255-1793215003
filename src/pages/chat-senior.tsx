@@ -55,14 +55,6 @@ export default function SeniorChat() {
         content: initialMessage,
         timestamp: new Date(),
       }]);
-    } else if (messages.length === 0) {
-      // Default message if no context
-      setMessages([{
-        id: "1",
-        role: "assistant",
-        content: "Hello! I'm your AI assistant. How can I help you today?",
-        timestamp: new Date(),
-      }]);
     }
     
     if (conversation && typeof conversation === "string" && authToken) {
@@ -529,6 +521,20 @@ export default function SeniorChat() {
     });
   };
 
+  const handleContextSelection = (context: "do" | "answer") => {
+    setChatContext(context);
+    const initialMessage = context === "do" 
+      ? "Tell me what you need to do and when"
+      : "What do you want to know?";
+    
+    setMessages([{
+      id: "1",
+      role: "assistant",
+      content: initialMessage,
+      timestamp: new Date(),
+    }]);
+  };
+
   const speakText = (text: string) => {
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -617,42 +623,70 @@ export default function SeniorChat() {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4 sm:space-y-6">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${
-              message.role === "user" ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div
-              className={`max-w-[85%] rounded-2xl sm:rounded-3xl px-4 sm:px-8 py-4 sm:py-6 shadow-lg ${
-                message.role === "user"
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white"
-                  : "bg-white text-gray-800 border-2 border-gray-200"
-              }`}
-            >
-              <p className="text-lg sm:text-2xl leading-relaxed">{message.content}</p>
-              {mounted && (
-                <span className="text-xs sm:text-sm opacity-70 mt-2 sm:mt-3 block">
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              )}
+        {chatContext === null ? (
+          /* Context Selection Screen */
+          <div className="flex flex-col items-center justify-center h-full space-y-8">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-800 text-center">
+              How can I help you?
+            </h2>
+            <div className="flex flex-col sm:flex-row gap-6">
+              <Button
+                onClick={() => handleContextSelection("do")}
+                size="lg"
+                className="w-64 h-32 text-2xl font-semibold bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl rounded-2xl"
+              >
+                Do This
+              </Button>
+              <Button
+                onClick={() => handleContextSelection("answer")}
+                size="lg"
+                className="w-64 h-32 text-2xl font-semibold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-xl rounded-2xl"
+              >
+                Answer This
+              </Button>
             </div>
           </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-white rounded-2xl sm:rounded-3xl px-6 sm:px-8 py-4 sm:py-6 shadow-lg border-2 border-gray-200">
-              <div className="flex gap-2 sm:gap-3">
-                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce delay-100"></div>
-                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+        ) : (
+          /* Messages Display */
+          <>
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${
+                  message.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-2xl sm:rounded-3xl px-4 sm:px-8 py-4 sm:py-6 shadow-lg ${
+                    message.role === "user"
+                      ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white"
+                      : "bg-white text-gray-800 border-2 border-gray-200"
+                  }`}
+                >
+                  <p className="text-lg sm:text-2xl leading-relaxed">{message.content}</p>
+                  {mounted && (
+                    <span className="text-xs sm:text-sm opacity-70 mt-2 sm:mt-3 block">
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white rounded-2xl sm:rounded-3xl px-6 sm:px-8 py-4 sm:py-6 shadow-lg border-2 border-gray-200">
+                  <div className="flex gap-2 sm:gap-3">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
         <div ref={messagesEndRef} />
       </div>

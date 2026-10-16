@@ -177,23 +177,15 @@ export default function FanDragonPage() {
                         </h2>
                     </div>
 
-                    {/* Context-Specific Chat Buttons */}
+                    {/* Single Start Chat Button */}
                     {user && (
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mt-12">
-                            <Link href="/chat-senior?context=do">
+                        <div className="flex items-center justify-center mt-12">
+                            <Link href="/chat-senior">
                                 <Button
                                     size="lg"
-                                    className="w-64 h-20 text-2xl font-semibold bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl"
+                                    className="w-64 h-20 text-2xl font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-xl"
                                 >
-                                    Do This
-                                </Button>
-                            </Link>
-                            <Link href="/chat-senior?context=answer">
-                                <Button
-                                    size="lg"
-                                    className="w-64 h-20 text-2xl font-semibold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-xl"
-                                >
-                                    Answer This
+                                    Start Chat
                                 </Button>
                             </Link>
                         </div>
