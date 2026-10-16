@@ -15,14 +15,7 @@ interface Message {
 }
 
 export default function SeniorChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Hello! I'm your AI assistant. How can I help you today?",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -33,6 +26,7 @@ export default function SeniorChat() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showTextInput, setShowTextInput] = useState(false);
+  const [chatContext, setChatContext] = useState<"do" | "answer" | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -44,7 +38,33 @@ export default function SeniorChat() {
   }, []);
 
   useEffect(() => {
-    const { conversation } = router.query;
+    const { conversation, context } = router.query;
+    
+    // Set context-specific initial message
+    if (context && typeof context === "string" && messages.length === 0) {
+      const contextType = context as "do" | "answer";
+      setChatContext(contextType);
+      
+      const initialMessage = contextType === "do" 
+        ? "Tell me what you need to do and when"
+        : "What do you want to know?";
+      
+      setMessages([{
+        id: "1",
+        role: "assistant",
+        content: initialMessage,
+        timestamp: new Date(),
+      }]);
+    } else if (messages.length === 0) {
+      // Default message if no context
+      setMessages([{
+        id: "1",
+        role: "assistant",
+        content: "Hello! I'm your AI assistant. How can I help you today?",
+        timestamp: new Date(),
+      }]);
+    }
+    
     if (conversation && typeof conversation === "string" && authToken) {
       loadExistingConversation(conversation);
     }
@@ -671,6 +691,9 @@ export default function SeniorChat() {
             onStop={handleStop}
             onHearAgain={handleHearAgain}
             onEndThread={handleEndThread}
+            isRecording={isRecording}
+            isSpeaking={isSpeaking}
+            isLoading={isLoading}
           />
         )}
       </div>

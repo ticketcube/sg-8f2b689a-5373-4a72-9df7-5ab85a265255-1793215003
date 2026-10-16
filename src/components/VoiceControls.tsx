@@ -1,99 +1,78 @@
-"use client";
-
-import { Mic, Square, RotateCcw, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Mic, MicOff, Volume2, Square } from "lucide-react";
 
 interface VoiceControlsProps {
-  onStart?: () => void;
-  onStop?: () => void;
-  onHearAgain?: () => void;
-  onEndThread?: () => void;
+  onStart: () => void;
+  onStop: () => void;
+  onHearAgain: () => void;
+  onEndThread: () => void;
+  isRecording?: boolean;
+  isSpeaking?: boolean;
+  isLoading?: boolean;
 }
 
 export function VoiceControls({
-  onStart = () => {},
-  onStop = () => {},
-  onHearAgain = () => {},
-  onEndThread = () => {},
+  onStart,
+  onStop,
+  onHearAgain,
+  onEndThread,
+  isRecording = false,
+  isSpeaking = false,
+  isLoading = false,
 }: VoiceControlsProps) {
   return (
-    <section
-      aria-label="Voice assistant controls"
-      className="mx-auto w-full max-w-lg px-4 py-8"
-    >
-      {/* Primary action */}
-      <div className="mb-8 flex justify-center">
-        <button
-          onClick={onStart}
-          aria-label="Start talking"
-          className="flex h-52 w-52 flex-col items-center justify-center
-          rounded-full border-[8px] border-green-200 bg-green-600
-          text-white shadow-xl transition-all duration-200
-          hover:scale-105 hover:bg-green-700 active:scale-95
-          focus-visible:outline focus-visible:outline-4
-          focus-visible:outline-offset-4 focus-visible:outline-green-800
-          sm:h-56 sm:w-56"
+    <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
+      {/* Main Voice Button - Toggle between Start (Green) and Stop (Red) */}
+      <div className="flex justify-center">
+        <Button
+          onClick={isRecording ? onStop : onStart}
+          disabled={isLoading}
+          size="lg"
+          className={`w-32 h-32 sm:w-40 sm:h-40 rounded-full shadow-2xl transition-all duration-200 ${
+            isRecording
+              ? "bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 animate-pulse"
+              : "bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+          }`}
         >
-          <Mic size={58} strokeWidth={2.5} />
-          <span className="mt-3 text-3xl font-extrabold tracking-wide">
-            START
-          </span>
-          <span className="mt-1 text-lg">Tap to talk</span>
-        </button>
+          {isRecording ? (
+            <Square className="w-16 h-16 sm:w-20 sm:h-20 text-white" />
+          ) : (
+            <Mic className="w-16 h-16 sm:w-20 sm:h-20 text-white" />
+          )}
+        </Button>
       </div>
 
-      {/* Secondary actions */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
-        {/* STOP */}
-        <button
-          onClick={onStop}
-          aria-label="Stop speaking or listening"
-          className="flex min-h-36 flex-col items-center justify-center
-          rounded-3xl border-4 border-red-200 bg-red-600 px-2 py-5
-          text-white shadow-lg transition-all hover:bg-red-700
-          active:scale-95 focus-visible:outline focus-visible:outline-4
-          focus-visible:outline-offset-2 focus-visible:outline-red-800"
-        >
-          <Square size={36} fill="currentColor" strokeWidth={2.5} />
-          <span className="mt-3 text-xl font-extrabold sm:text-2xl">
-            STOP
-          </span>
-          <span className="mt-1 text-center text-sm">Pause voice</span>
-        </button>
+      {/* Status Text */}
+      <div className="text-center">
+        <p className="text-xl sm:text-2xl font-semibold text-gray-700">
+          {isRecording ? "Listening..." : isSpeaking ? "Speaking..." : isLoading ? "Processing..." : "Tap to speak"}
+        </p>
+      </div>
 
-        {/* HEAR AGAIN */}
-        <button
+      {/* Secondary Controls - Hear Again and End Thread */}
+      <div className="flex justify-center gap-4 sm:gap-6">
+        <Button
           onClick={onHearAgain}
-          aria-label="Hear the last response again"
-          className="flex min-h-36 flex-col items-center justify-center
-          rounded-3xl border-4 border-blue-200 bg-blue-600 px-2 py-5
-          text-white shadow-lg transition-all hover:bg-blue-700
-          active:scale-95 focus-visible:outline focus-visible:outline-4
-          focus-visible:outline-offset-2 focus-visible:outline-blue-800"
+          disabled={isLoading || isRecording}
+          variant="outline"
+          size="lg"
+          className="h-16 sm:h-20 px-6 sm:px-10 rounded-2xl border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 disabled:opacity-50"
         >
-          <RotateCcw size={36} strokeWidth={2.5} />
-          <span className="mt-3 text-center text-base font-extrabold sm:text-xl">
-            HEAR AGAIN
-          </span>
-          <span className="mt-1 text-center text-sm">Repeat response</span>
-        </button>
+          <Volume2 className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 mr-2 sm:mr-3" />
+          <span className="text-lg sm:text-xl font-semibold text-gray-700">Hear Again</span>
+        </Button>
 
-        {/* END THREAD */}
-        <button
+        <Button
           onClick={onEndThread}
-          aria-label="End this conversation"
-          className="flex min-h-36 flex-col items-center justify-center
-          rounded-3xl border-4 border-purple-200 bg-purple-700 px-2 py-5
-          text-white shadow-lg transition-all hover:bg-purple-800
-          active:scale-95 focus-visible:outline focus-visible:outline-4
-          focus-visible:outline-offset-2 focus-visible:outline-purple-900"
+          disabled={isLoading || isRecording}
+          variant="outline"
+          size="lg"
+          className="h-16 sm:h-20 px-6 sm:px-10 rounded-2xl border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 disabled:opacity-50"
         >
-          <LogOut size={36} strokeWidth={2.5} />
-          <span className="mt-3 text-center text-sm font-extrabold sm:text-lg">
-            END THREAD
-          </span>
-          <span className="mt-1 text-center text-sm">Finish chat</span>
-        </button>
+          <MicOff className="w-6 h-6 sm:w-8 sm:h-8 text-red-600 mr-2 sm:mr-3" />
+          <span className="text-lg sm:text-xl font-semibold text-gray-700">End Thread</span>
+        </Button>
       </div>
-    </section>
+    </div>
   );
 }
