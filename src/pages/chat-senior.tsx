@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { VoiceControls } from "@/components/VoiceControls";
 import { supabase } from "@/integrations/supabase/client";
 import { useRouter } from "next/router";
+import Link from "next/link";
 
 interface Message {
   id: string;
@@ -605,6 +606,15 @@ export default function SeniorChat() {
           <h1 className="text-xl sm:text-3xl font-bold text-gray-800">Chat Assistant</h1>
         </div>
         <div className="flex items-center gap-2 sm:gap-4">
+          <Link href="/dashboard">
+            <Button 
+              variant="outline"
+              size="lg" 
+              className="px-4 sm:px-6 py-2 sm:py-3"
+            >
+              <span className="text-base sm:text-lg font-semibold">Dashboard</span>
+            </Button>
+          </Link>
           <Button 
             variant={showTextInput ? "default" : "outline"}
             size="lg" 
