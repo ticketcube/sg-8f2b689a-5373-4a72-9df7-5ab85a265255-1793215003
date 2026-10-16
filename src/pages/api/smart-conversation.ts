@@ -291,6 +291,9 @@ Keep your response brief and friendly.`;
       // Regular conversation mode with function calling
       systemPrompt = `You are a helpful, intelligent AI assistant similar to ChatGPT or Claude.
 
+CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
+Use this date to calculate relative dates like "tomorrow", "next week", etc.
+
 CORE CAPABILITIES:
 
 1. REAL-TIME WEB SEARCH:
