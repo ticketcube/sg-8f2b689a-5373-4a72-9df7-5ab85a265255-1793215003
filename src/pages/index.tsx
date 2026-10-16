@@ -176,20 +176,6 @@ export default function FanDragonPage() {
                             Your AI Ticket Agent
                         </h2>
                     </div>
-
-                    {/* Single Start Chat Button */}
-                    {user && (
-                        <div className="flex items-center justify-center mt-12">
-                            <Link href="/chat-senior">
-                                <Button
-                                    size="lg"
-                                    className="w-64 h-20 text-2xl font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-xl"
-                                >
-                                    Start Chat
-                                </Button>
-                            </Link>
-                        </div>
-                    )}
                 </div>
             </main>
 
