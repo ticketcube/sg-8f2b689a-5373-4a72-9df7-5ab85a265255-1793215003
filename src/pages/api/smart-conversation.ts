@@ -427,16 +427,16 @@ Remember: You're a capable AI assistant with real-time information access, task 
     }
 
     // Call Responses API
-    const response = await openai.responses.create({
+    const response = await openai.chat.completions.create({
       model: "gpt-4o",
-      input: inputMessages,
+      messages: inputMessages,
       tools: allTools.length > 0 ? allTools : undefined,
       temperature: mode === "title_edit" ? 0.3 : 0.7,
     });
 
     console.log("🟦 OPENAI_RESPONSE: Received response");
 
-    const aiResponse = response.output_text || "";
+    const aiResponse = response.choices[0].message.content || "";
     console.log("🟦 OPENAI_RESPONSE: Response length =", aiResponse.length);
 
     // Detect conversation type from messages
