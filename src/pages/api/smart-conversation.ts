@@ -100,6 +100,39 @@ const tools = [
   }
 ];
 
+// MCP tool configuration for Ticketmaster
+function getTicketmasterMCPTool() {
+  const mcpUrl = process.env.TICKETMASTER_MCP_URL;
+  const mcpToken = process.env.TICKETMASTER_MCP_TOKEN;
+
+  if (!mcpUrl) {
+    console.log("⚠️ TICKETMASTER_MCP_URL not configured, skipping MCP tool");
+    return null;
+  }
+
+  const mcpTool: any = {
+    type: "mcp",
+    server_label: "ticketmaster",
+    server_url: mcpUrl,
+    allowed_tools: [
+      "search_events",
+      "get_artist_shows",
+      "get_event_details",
+      "find_attractions",
+      "search_venues",
+    ],
+    require_approval: "never",
+  };
+
+  if (mcpToken) {
+    mcpTool.headers = {
+      Authorization: `Bearer ${mcpToken}`,
+    };
+  }
+
+  return mcpTool;
+}
+
 // Function execution handlers
 async function executeFunctionCall(
   functionName: string,
@@ -274,6 +307,8 @@ export default async function handler(
       });
     }
 
+    const today = new Date().toISOString().split('T')[0];
+
     // Different system prompts based on mode
     let systemPrompt = "";
 
@@ -288,21 +323,30 @@ Ask them clearly: "Should I save this conversation as [current title]?"
 If they want a different title, ask them to speak the new title.
 Keep your response brief and friendly.`;
     } else {
-      // Regular conversation mode with function calling
+      // Regular conversation mode with function calling and Ticketmaster
       systemPrompt = `You are a helpful, intelligent AI assistant similar to ChatGPT or Claude.
 
-CURRENT DATE: ${new Date().toISOString().split('T')[0]} (YYYY-MM-DD format)
-Use this date to calculate relative dates like "tomorrow", "next week", etc.
+CURRENT DATE: ${today} (YYYY-MM-DD format)
+Use this date to calculate relative dates like "tomorrow", "next week", "this weekend", etc.
 
 CORE CAPABILITIES:
 
-1. REAL-TIME WEB SEARCH:
+1. TICKETMASTER EVENT SEARCH:
+   - When the user asks about concerts, games, shows, or tickets, use the Ticketmaster tools
+   - Convert relative dates like "this weekend" or "next month" to ISO 8601 UTC format for startDateTime/endDateTime
+   - ALWAYS give the event's affiliateUrl as the ticket link
+   - NEVER share a link for an event marked marketplaceOnly
+   - For voice replies, list at most 3 events: name, day, time, and venue. Offer to text or show the links
+   - Use size: 20 for searches unless the user asks for a complete list
+   - Available tools: search_events, get_artist_shows, get_event_details, find_attractions, search_venues
+
+2. REAL-TIME WEB SEARCH:
    - You have access to live web search via Brave Search API
    - USE IT PROACTIVELY for: current events, weather, news, facts, recipes, business info, sports scores, stock prices, or ANY information that could be time-sensitive
    - When user asks about real-time information, search FIRST, then provide a natural answer
    - Don't guess or rely on training data for questions with time-sensitive answers
 
-2. CALENDAR & TASK MANAGEMENT:
+3. CALENDAR & TASK MANAGEMENT:
    You can create and retrieve calendar events for:
    - Shopping lists (event_type="shopping")
    - Tasks and to-dos (event_type="task")  
@@ -310,12 +354,18 @@ CORE CAPABILITIES:
    - Reminders (event_type="reminder")
    - Birthdays, milestones, general events
 
-3. PROACTIVE ASSISTANCE:
+4. PROACTIVE ASSISTANCE:
    - When user mentions something to buy/do/remember, CREATE the event immediately
    - Don't just acknowledge - take action using the functions
    - Confirm what you've saved naturally: "Got it, I've added [item] to your [list/calendar]"
 
 FUNCTION USAGE GUIDELINES:
+
+TICKETMASTER SEARCHES:
+- "What concerts are in Tampa this weekend?" → search_events with location and date range
+- "When is Dan + Shay playing next?" → get_artist_shows for the artist
+- "Show me hockey games in Boston" → search_events with keyword and location
+- Keep search size to 20 results unless user wants more
 
 CREATE EVENTS when user mentions:
 - "I need to buy milk" → create_calendar_event(type="shopping", title="Milk")
@@ -343,126 +393,59 @@ PERSONALITY & STYLE:
 - Be concise but thorough
 - Ask clarifying questions when needed
 - Use natural language (don't announce "I'm calling a function")
-- Synthesize web search results into clear, natural answers
+- Synthesize search results into clear, natural answers
 
 CONTEXT AWARENESS:
 ${conversationMessages.length > 0 ? "Continue this conversation naturally. Previous context is provided in the message history." : "This is a fresh conversation - introduce yourself helpfully."}
 
-Remember: You're a capable AI assistant with real-time information access and task management powers. Use them to be genuinely helpful.`;
+Remember: You're a capable AI assistant with real-time information access, task management powers, and Ticketmaster event search. Use them to be genuinely helpful.`;
     }
 
-    // Build messages array
-    const messages: ChatCompletionMessageParam[] = [
+    // Build input messages for Responses API
+    const inputMessages = [
       {
-        role: "system",
+        role: "system" as const,
         content: systemPrompt,
       },
-      ...conversationMessages.map((m: any): ChatCompletionMessageParam => {
-        if (m.role === "tool") {
-          return {
-            role: "tool",
-            content: m.content,
-            tool_call_id: m.tool_call_id
-          };
-        }
-        if (m.role === "assistant" && m.tool_calls) {
-          return {
-            role: "assistant",
-            content: m.content || null,
-            tool_calls: m.tool_calls
-          };
-        }
-        return {
-          role: m.role,
-          content: m.content
-        };
-      }),
+      ...conversationMessages.map((m: any) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content
+      })),
       {
-        role: "user",
+        role: "user" as const,
         content: message,
       },
     ];
 
-    console.log("🟦 OPENAI_REQUEST: Preparing to call OpenAI");
-    console.log("🟦 OPENAI_REQUEST: Message count =", messages.length);
+    console.log("🟦 OPENAI_REQUEST: Preparing to call OpenAI Responses API");
+    console.log("🟦 OPENAI_REQUEST: Message count =", inputMessages.length);
     console.log("🟦 OPENAI_REQUEST: Mode =", mode);
 
-    // Get AI response with function calling
-    const completion = await openai.chat.completions.create({
+    // Prepare tools array
+    const allTools: any[] = mode === "conversation" ? [...tools] : [];
+    
+    // Add Ticketmaster MCP if configured and in conversation mode
+    if (mode === "conversation") {
+      const mcpTool = getTicketmasterMCPTool();
+      if (mcpTool) {
+        allTools.push(mcpTool);
+        console.log("🟦 MCP_CONFIG: Ticketmaster MCP tool added");
+      }
+    }
+
+    // Call Responses API
+    const response = await openai.responses.create({
       model: "gpt-4o",
-      messages,
-      tools: mode === "conversation" ? tools : undefined,
-      tool_choice: mode === "conversation" ? "auto" : undefined,
+      input: inputMessages,
+      tools: allTools.length > 0 ? allTools : undefined,
       temperature: mode === "title_edit" ? 0.3 : 0.7,
       max_tokens: mode === "title_edit" ? 100 : 500,
     });
 
     console.log("🟦 OPENAI_RESPONSE: Received response");
 
-    let aiResponse = completion.choices[0].message.content || "";
-    const toolCalls = completion.choices[0].message.tool_calls;
-
-    console.log("🟦 OPENAI_RESPONSE: Tool calls =", toolCalls?.length || 0);
-
-    const toolResults: Array<{ toolCallId: string; functionName: string; result: any }> = [];
-
-    // Handle function calls
-    if (toolCalls && toolCalls.length > 0) {
-      console.log("🟦 FUNCTION_EXECUTION: Processing", toolCalls.length, "function calls");
-      
-      const functionMessages: ChatCompletionMessageParam[] = [
-        ...messages, 
-        {
-          role: "assistant",
-          content: completion.choices[0].message.content,
-          tool_calls: completion.choices[0].message.tool_calls
-        }
-      ];
-
-      for (const toolCall of toolCalls) {
-        if (toolCall.type === "function") {
-          const functionName = toolCall.function.name;
-          const functionArgs = JSON.parse(toolCall.function.arguments);
-
-          console.log("🟦 FUNCTION_CALL: Executing", functionName, "with args:", functionArgs);
-
-          const functionResult = await executeFunctionCall(
-            functionName,
-            functionArgs,
-            supabase,
-            userId,
-            req
-          );
-
-          console.log("🟦 FUNCTION_RESULT:", functionName, "=>", functionResult);
-
-          toolResults.push({
-            toolCallId: toolCall.id,
-            functionName,
-            result: functionResult
-          });
-
-          functionMessages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: JSON.stringify(functionResult),
-          });
-        }
-      }
-
-      console.log("🟦 OPENAI_REQUEST: Getting final response with function results");
-
-      // Get final response from AI with function results
-      const finalCompletion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: functionMessages,
-        temperature: 0.7,
-        max_tokens: 500,
-      });
-
-      aiResponse = finalCompletion.choices[0].message.content || "Done!";
-      console.log("🟦 OPENAI_RESPONSE: Final response length =", aiResponse.length);
-    }
+    const aiResponse = response.output_text || "";
+    console.log("🟦 OPENAI_RESPONSE: Response length =", aiResponse.length);
 
     // Detect conversation type from messages
     let conversationType: "shopping" | "task" | "appointment" | "general" = "general";
@@ -490,38 +473,12 @@ Remember: You're a capable AI assistant with real-time information access and ta
         content: message,
         timestamp: new Date().toISOString(),
       } as ConversationMessage,
+      {
+        role: "assistant",
+        content: aiResponse,
+        timestamp: new Date().toISOString(),
+      } as ConversationMessage,
     ];
-
-    // Add assistant message with tool calls if present
-    if (toolCalls && toolCalls.length > 0) {
-      updatedMessages.push({
-        role: "assistant",
-        content: completion.choices[0].message.content || null,
-        timestamp: new Date().toISOString(),
-        tool_calls: toolCalls,
-      } as ConversationMessage);
-
-      for (const toolResult of toolResults) {
-        updatedMessages.push({
-          role: "tool",
-          content: JSON.stringify(toolResult.result),
-          tool_call_id: toolResult.toolCallId,
-          timestamp: new Date().toISOString(),
-        } as ConversationMessage);
-      }
-
-      updatedMessages.push({
-        role: "assistant",
-        content: aiResponse,
-        timestamp: new Date().toISOString(),
-      } as ConversationMessage);
-    } else {
-      updatedMessages.push({
-        role: "assistant",
-        content: aiResponse,
-        timestamp: new Date().toISOString(),
-      } as ConversationMessage);
-    }
 
     const conversationTitle = conversationMessages.length === 0 
       ? message.slice(0, 50) + (message.length > 50 ? "..." : "")
@@ -570,32 +527,20 @@ Remember: You're a capable AI assistant with real-time information access and ta
       // Log API usage
       console.log("📊 LOGGING API USAGE");
       
-      const tokensUsed = completion.usage;
+      const tokensUsed = response.usage;
       if (tokensUsed) {
         await logApiUsage({
           userId,
           apiName: "openai",
           endpoint: "/api/smart-conversation",
           model: "gpt-4o",
-          tokensInput: tokensUsed.prompt_tokens,
-          tokensOutput: tokensUsed.completion_tokens,
-          tokensTotal: tokensUsed.total_tokens,
+          tokensInput: tokensUsed.input_tokens || 0,
+          tokensOutput: tokensUsed.output_tokens || 0,
+          tokensTotal: (tokensUsed.input_tokens || 0) + (tokensUsed.output_tokens || 0),
           requestData: {
             conversation_id: resultConversationId,
             conversation_type: conversationType,
-          },
-        });
-      }
-
-      const webSearchCalls = toolCalls?.filter((tc: any) => tc.function?.name === "web_search").length || 0;
-      if (webSearchCalls > 0) {
-        await logApiUsage({
-          userId,
-          apiName: "brave_search",
-          endpoint: "/api/web-search",
-          apiCalls: webSearchCalls,
-          requestData: {
-            conversation_id: resultConversationId,
+            mcp_enabled: !!process.env.TICKETMASTER_MCP_URL,
           },
         });
       }

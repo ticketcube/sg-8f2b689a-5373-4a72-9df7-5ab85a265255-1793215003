@@ -10,6 +10,10 @@ const OPENAI_PRICING = {
     input: 30.00 / 1_000_000,
     output: 60.00 / 1_000_000,
   },
+  "gpt-4o": {
+    input: 2.50 / 1_000_000,   // $2.50 per 1M input tokens
+    output: 10.00 / 1_000_000, // $10.00 per 1M output tokens
+  },
   "tts-1": {
     perChar: 15.00 / 1_000_000, // $15 per 1M characters
   },
