@@ -103,7 +103,6 @@ const tools = [
 // MCP tool configuration for Ticketmaster
 function getTicketmasterMCPTool() {
   const mcpUrl = process.env.TICKETMASTER_MCP_URL;
-  const mcpToken = process.env.TICKETMASTER_MCP_TOKEN;
 
   if (!mcpUrl) {
     console.log("⚠️ TICKETMASTER_MCP_URL not configured, skipping MCP tool");
@@ -123,12 +122,6 @@ function getTicketmasterMCPTool() {
     ],
     require_approval: "never",
   };
-
-  if (mcpToken) {
-    mcpTool.headers = {
-      Authorization: `Bearer ${mcpToken}`,
-    };
-  }
 
   return mcpTool;
 }
