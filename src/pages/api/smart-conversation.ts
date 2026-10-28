@@ -526,9 +526,9 @@ Remember: You're a capable AI assistant with real-time information access, task 
           apiName: "openai",
           endpoint: "/api/smart-conversation",
           model: "gpt-4o",
-          tokensInput: tokensUsed.input_tokens || 0,
-          tokensOutput: tokensUsed.output_tokens || 0,
-          tokensTotal: (tokensUsed.input_tokens || 0) + (tokensUsed.output_tokens || 0),
+          tokensInput: tokensUsed.prompt_tokens || 0,
+          tokensOutput: tokensUsed.completion_tokens || 0,
+          tokensTotal: tokensUsed.total_tokens || 0,
           requestData: {
             conversation_id: resultConversationId,
             conversation_type: conversationType,
