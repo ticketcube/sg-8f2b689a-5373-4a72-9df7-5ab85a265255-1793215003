@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { getAuthenticatedUser } from "@/lib/supabase-server";
 import { logApiUsage } from "@/lib/api-cost-tracker";
 import { performWebSearch } from "@/lib/web-search";
@@ -25,77 +24,74 @@ interface CalendarEventRequest {
 const tools = [
   {
     type: "function" as const,
-    function: {
-      name: "create_calendar_event",
-      description: "Create a calendar event for reminders, appointments, tasks, shopping items, or any scheduled activity.",
-      parameters: {
-        type: "object",
-        properties: {
-          title: {
-            type: "string",
-            description: "Title of the event or item"
-          },
-          description: {
-            type: "string",
-            description: "Optional detailed description"
-          },
-          event_date: {
-            type: "string",
-            description: "Date in YYYY-MM-DD format"
-          },
-          event_type: {
-            type: "string",
-            enum: ["reminder", "milestone", "event", "birthday", "appointment", "task", "shopping", "other"],
-            description: "Type of event - use 'shopping' for shopping items, 'task' for to-dos"
-          },
-          all_day: {
-            type: "boolean",
-            description: "Whether this is an all-day event"
-          },
-          event_time: {
-            type: "string",
-            description: "Time in HH:MM format if not all_day"
-          }
+    strict: false,
+    name: "create_calendar_event",
+    description: "Create a calendar event for reminders, appointments, tasks, shopping items, or any scheduled activity.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Title of the event or item"
         },
-        required: ["title", "event_date", "event_type"]
-      }
+        description: {
+          type: "string",
+          description: "Optional detailed description"
+        },
+        event_date: {
+          type: "string",
+          description: "Date in YYYY-MM-DD format"
+        },
+        event_type: {
+          type: "string",
+          enum: ["reminder", "milestone", "event", "birthday", "appointment", "task", "shopping", "other"],
+          description: "Type of event - use 'shopping' for shopping items, 'task' for to-dos"
+        },
+        all_day: {
+          type: "boolean",
+          description: "Whether this is an all-day event"
+        },
+        event_time: {
+          type: "string",
+          description: "Time in HH:MM format if not all_day"
+        }
+      },
+      required: ["title", "event_date", "event_type"]
     }
   },
   {
     type: "function" as const,
-    function: {
-      name: "get_calendar_events",
-      description: "Retrieve calendar events. Can filter by type (e.g., 'shopping' for shopping list items).",
-      parameters: {
-        type: "object",
-        properties: {
-          event_type: {
-            type: "string",
-            description: "Optional filter by event type (shopping, task, appointment, etc.)"
-          },
-          upcoming_only: {
-            type: "boolean",
-            description: "If true, only return future events"
-          }
+    strict: false,
+    name: "get_calendar_events",
+    description: "Retrieve calendar events. Can filter by type (e.g., 'shopping' for shopping list items).",
+    parameters: {
+      type: "object",
+      properties: {
+        event_type: {
+          type: "string",
+          description: "Optional filter by event type (shopping, task, appointment, etc.)"
+        },
+        upcoming_only: {
+          type: "boolean",
+          description: "If true, only return future events"
         }
       }
     }
   },
   {
     type: "function" as const,
-    function: {
-      name: "web_search",
-      description: "Perform a web search to find real-time information on any topic.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "The search query or topic to search for"
-          }
-        },
-        required: ["query"]
-      }
+    strict: false,
+    name: "web_search",
+    description: "Perform a web search to find real-time information on any topic.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "The search query or topic to search for"
+        }
+      },
+      required: ["query"]
     }
   }
 ];
@@ -400,10 +396,13 @@ Remember: You're a capable AI assistant with real-time information access, task 
         role: "system" as const,
         content: systemPrompt,
       },
-      ...conversationMessages.map((m: any) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content
-      })),
+      // Older conversations saved Chat Completions tool messages; the Responses API rejects those
+      ...conversationMessages
+        .filter((m: any) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content)
+        .map((m: any) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content
+        })),
       {
         role: "user" as const,
         content: message,
@@ -426,17 +425,58 @@ Remember: You're a capable AI assistant with real-time information access, task 
       }
     }
 
-    // Call Responses API
-    const response = await openai.responses.create({
+    // Call Responses API. MCP tools run on OpenAI's side; our function tools
+    // come back as function_call items that we execute and send back.
+    const requestOptions = {
       model: "gpt-4o",
-      input: inputMessages,
       tools: allTools.length > 0 ? allTools : undefined,
       temperature: mode === "title_edit" ? 0.3 : 0.7,
+      max_output_tokens: mode === "title_edit" ? 100 : 1000,
+    };
+
+    let response = await openai.responses.create({
+      ...requestOptions,
+      input: inputMessages,
     });
+
+    let tokensInput = response.usage?.input_tokens || 0;
+    let tokensOutput = response.usage?.output_tokens || 0;
+
+    for (let round = 0; round < 5; round++) {
+      const functionCalls = response.output.filter((item: any) => item.type === "function_call") as any[];
+      if (functionCalls.length === 0) break;
+
+      const functionOutputs: any[] = [];
+      for (const call of functionCalls) {
+        let functionArgs: any = {};
+        try {
+          functionArgs = JSON.parse(call.arguments || "{}");
+        } catch {
+          console.log("🔴 FUNCTION_ERROR: Could not parse arguments for", call.name);
+        }
+
+        const functionResult = await executeFunctionCall(call.name, functionArgs, supabase, userId, req);
+
+        functionOutputs.push({
+          type: "function_call_output",
+          call_id: call.call_id,
+          output: JSON.stringify(functionResult),
+        });
+      }
+
+      response = await openai.responses.create({
+        ...requestOptions,
+        previous_response_id: response.id,
+        input: functionOutputs,
+      });
+
+      tokensInput += response.usage?.input_tokens || 0;
+      tokensOutput += response.usage?.output_tokens || 0;
+    }
 
     console.log("🟦 OPENAI_RESPONSE: Received response");
 
-    const aiResponse = response.output_text || "";
+    const aiResponse = response.output_text || "Done!";
     console.log("🟦 OPENAI_RESPONSE: Response length =", aiResponse.length);
 
     // Detect conversation type from messages
@@ -519,16 +559,15 @@ Remember: You're a capable AI assistant with real-time information access, task 
       // Log API usage
       console.log("📊 LOGGING API USAGE");
       
-      const tokensUsed = response.usage;
-      if (tokensUsed) {
+      if (tokensInput || tokensOutput) {
         await logApiUsage({
           userId,
           apiName: "openai",
           endpoint: "/api/smart-conversation",
           model: "gpt-4o",
-          tokensInput: tokensUsed.input_tokens || 0,
-          tokensOutput: tokensUsed.output_tokens || 0,
-          tokensTotal: (tokensUsed.input_tokens || 0) + (tokensUsed.output_tokens || 0),
+          tokensInput,
+          tokensOutput,
+          tokensTotal: tokensInput + tokensOutput,
           requestData: {
             conversation_id: resultConversationId,
             conversation_type: conversationType,
