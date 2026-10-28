@@ -439,7 +439,6 @@ Remember: You're a capable AI assistant with real-time information access, task 
       input: inputMessages,
       tools: allTools.length > 0 ? allTools : undefined,
       temperature: mode === "title_edit" ? 0.3 : 0.7,
-      max_tokens: mode === "title_edit" ? 100 : 500,
     });
 
     console.log("🟦 OPENAI_RESPONSE: Received response");
