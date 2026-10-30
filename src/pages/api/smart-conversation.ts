@@ -421,23 +421,81 @@ Remember: You're a capable AI assistant with real-time information access, task 
     if (mode === "conversation") {
       const mcpTool = getTicketmasterMCPTool();
       if (mcpTool) {
-        allTools.push(mcpTool);
-        console.log("🟦 MCP_CONFIG: Ticketmaster MCP tool added");
+        // Filter: OpenAI only accepts type="function", not type="mcp"
+        // MCP tools require middleware translation
+        console.log("🟦 MCP_CONFIG: Ticketmaster MCP tool detected but skipped (OpenAI requires type='function')");
       }
     }
 
-    // Call Responses API
-    const response = await openai.chat.completions.create({
+    // Filter to only include valid OpenAI function tools
+    const validTools = allTools.filter(t => t.type === "function");
+
+    console.log("🟦 OPENAI_REQUEST: Preparing to call OpenAI with", validTools.length, "tools");
+
+    // Call Chat Completions API
+    let response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: inputMessages,
-      tools: allTools.length > 0 ? allTools : undefined,
+      tools: validTools.length > 0 ? validTools : undefined,
       temperature: mode === "title_edit" ? 0.3 : 0.7,
     });
 
     console.log("🟦 OPENAI_RESPONSE: Received response");
 
-    const aiResponse = response.choices[0].message.content || "";
-    console.log("🟦 OPENAI_RESPONSE: Response length =", aiResponse.length);
+    let responseMessage = response.choices[0].message;
+    let aiResponse = responseMessage.content || "";
+
+    // Handle tool calls - execute functions and get final response
+    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+      console.log("🟦 TOOL_CALLS: Processing", responseMessage.tool_calls.length, "tool call(s)");
+      
+      // Add assistant's tool call message to history
+      inputMessages.push(responseMessage as any);
+      
+      // Execute each tool call
+      for (const toolCall of responseMessage.tool_calls) {
+        if (toolCall.type === "function") {
+          const functionName = toolCall.function.name;
+          let functionArgs = {};
+          
+          try {
+            functionArgs = JSON.parse(toolCall.function.arguments || "{}");
+          } catch (parseError) {
+            console.error("🔴 TOOL_CALL_ERROR: Failed to parse arguments", parseError);
+          }
+          
+          console.log("🟦 TOOL_EXEC: Executing", functionName, "with args", functionArgs);
+          
+          const result = await executeFunctionCall(functionName, functionArgs, supabase, userId, req);
+          
+          // Add tool result to message history
+          inputMessages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: typeof result === 'string' ? result : JSON.stringify(result)
+          } as any);
+          
+          console.log("🟦 TOOL_RESULT: Function returned", result.success ? "success" : "error");
+        }
+      }
+      
+      // Send second request with tool results to get final response
+      console.log("🟦 OPENAI_REQUEST: Sending follow-up request with tool results");
+      
+      response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: inputMessages,
+        tools: validTools.length > 0 ? validTools : undefined,
+        temperature: mode === "title_edit" ? 0.3 : 0.7,
+      });
+      
+      responseMessage = response.choices[0].message;
+      aiResponse = responseMessage.content || "";
+      
+      console.log("🟦 OPENAI_RESPONSE: Final response after tool execution, length =", aiResponse.length);
+    } else {
+      console.log("🟦 OPENAI_RESPONSE: No tool calls, response length =", aiResponse.length);
+    }
 
     // Detect conversation type from messages
     let conversationType: "shopping" | "task" | "appointment" | "general" = "general";
