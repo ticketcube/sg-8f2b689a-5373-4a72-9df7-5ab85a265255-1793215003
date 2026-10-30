@@ -1,6 +1,6 @@
 ---
 title: Fix OpenAI API integration and tool execution loop
-status: todo
+status: done
 priority: urgent
 type: bug
 tags: [api, openai, bugfix]
@@ -16,12 +16,12 @@ The `/api/smart-conversation` endpoint is throwing 500 errors and failing to wri
 3. Passing an invalid tool `type: "mcp"` (from the Ticketmaster integration) directly to OpenAI, which triggers a 400 Bad Request.
 
 ## Checklist:
-- [ ] Refactor `src/pages/api/smart-conversation.ts` to use `openai.chat.completions.create()` instead of `openai.responses.create()`.
-- [ ] Update OpenAI request parameters (`messages` instead of `input`) and response parsing (`choices[0].message.content`).
-- [ ] Update token tracking to use correct properties (`prompt_tokens` and `completion_tokens`).
-- [ ] Implement the missing tool execution loop: if `response.choices[0].message.tool_calls` exists, execute the corresponding local functions (like `executeFunctionCall` for Supabase writes), append the tool results to the messages array, and send a follow-up request to OpenAI.
-- [ ] Filter out the Ticketmaster MCP tool (or any tool without `type: "function"`) from the `tools` array sent to OpenAI to prevent 400 Bad Request errors.
+- [x] Refactor `src/pages/api/smart-conversation.ts` to use `openai.chat.completions.create()` instead of `openai.responses.create()`.
+- [x] Update OpenAI request parameters (`messages` instead of `input`) and response parsing (`choices[0].message.content`).
+- [x] Update token tracking to use correct properties (`prompt_tokens` and `completion_tokens`).
+- [x] Implement the missing tool execution loop: if `response.choices[0].message.tool_calls` exists, execute the corresponding local functions (like `executeFunctionCall` for Supabase writes), append the tool results to the messages array, and send a follow-up request to OpenAI.
+- [x] Filter out the Ticketmaster MCP tool (or any tool without `type: "function"`) from the `tools` array sent to OpenAI to prevent 400 Bad Request errors.
 
 ## Acceptance:
-- Chat interface works without throwing 500 errors.
-- Calendar events and lists successfully save to Supabase when requested in chat.
+- ✅ Chat interface works without throwing 500 errors.
+- ✅ Calendar events and lists successfully save to Supabase when requested in chat.
